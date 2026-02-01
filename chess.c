@@ -2,80 +2,26 @@
  * Compatible with GBDK-2000 and Standard C
  */
 
-// --- Platform Detection & Types ---
-#ifdef __TARGET_gb
-#include <gb/gb.h>
-#include <stdio.h>
-    // This only prints the bottom 16 bits
-#define PRIu32 "u"
-#else
 #include <stdint.h>
 #include <stdio.h>
-#include <inttypes.h>
-typedef int8_t BYTE;
-typedef uint8_t UBYTE;
-typedef int16_t WORD;
-typedef uint16_t UWORD;
-#endif
-
-// --- Constants & Definitions ---
-
-#define BOARD_SIZE 128
-#define MAX_MOVES 256           // Increased to be safe
-
-// Pieces
-#define EMPTY 0
-#define PAWN 1
-#define KNIGHT 2
-#define BISHOP 3
-#define ROOK 4
-#define QUEEN 5
-#define KING 6
-
-#define COLOR_MASK 0x08
-#define WHITE 0x00
-#define BLACK 0x08
-
-// Castling Bits
-#define WK_CASTLE 1             // White King Side
-#define WQ_CASTLE 2             // White Queen Side
-#define BK_CASTLE 4             // Black King Side
-#define BQ_CASTLE 8             // Black Queen Side
-
-// Macros
-#define IS_OFFBOARD(sq) ((sq) & 0x88)
-#define GET_COLOR(piece) (piece & COLOR_MASK)
-#define GET_TYPE(piece) (piece & 0x07)
-#define OPPONENT(color) (color ^ BLACK)
-
-// --- Data Structures ---
-
-typedef struct {
-    UBYTE from;
-    UBYTE to;
-    UBYTE captured;
-    UBYTE special;              // 0=Normal, 1=EP Capture, 2=Castle
-    UBYTE old_castle;           // To restore state
-    UBYTE old_ep;               // To restore state
-} Move;
+#include "chess.h"
 
 // Global State
-UBYTE board[BOARD_SIZE];
-UBYTE sideToMove = WHITE;
-UBYTE castleRights = 0;         // Bitmask: 0000 KQkq
-UBYTE epSquare = 0;             // 0 if no EP, otherwise the square behind the pawn
+uint8_t board[BOARD_SIZE];
+uint8_t sideToMove = WHITE;
+uint8_t castleRights = 0;       // Bitmask: 0000 KQkq
+uint8_t epSquare = 0;           // 0 if no EP, otherwise the square behind the pawn
 
 // --- Lookup Data ---
-
-const BYTE knight_offsets[] = { -33, -31, -18, -14, 14, 18, 31, 33 };
-const BYTE king_offsets[] = { -17, -16, -15, -1, 1, 15, 16, 17 };
-const BYTE bishop_offsets[] = { -17, -15, 15, 17 };
-const BYTE rook_offsets[] = { -16, -1, 1, 16 };
+const int8_t knight_offsets[] = { -33, -31, -18, -14, 14, 18, 31, 33 };
+const int8_t king_offsets[] = { -17, -16, -15, -1, 1, 15, 16, 17 };
+const int8_t bishop_offsets[] = { -17, -15, 15, 17 };
+const int8_t rook_offsets[] = { -16, -1, 1, 16 };
 
 // --- Helper Functions ---
 
 // Check if a specific square is attacked by 'side'
-UBYTE is_square_attacked(UBYTE sq, UBYTE side) {
+uint8_t is_square_attacked(uint8_t sq, uint8_t side) {
     // side is the color of the ATTACKER (e.g. if White King is at sq, side is BLACK)
 
     // Check Pawn Attacks
@@ -94,9 +40,9 @@ UBYTE is_square_attacked(UBYTE sq, UBYTE side) {
     }
 
     // Check Knights
-    UBYTE i;
+    uint8_t i;
     for (i = 0; i < 8; i++) {
-        UBYTE target = sq - knight_offsets[i];  // Reverse offset check
+        uint8_t target = sq - knight_offsets[i];        // Reverse offset check
         if (!IS_OFFBOARD(target)) {
             if (board[target] == (side | KNIGHT))
                 return 1;
@@ -105,7 +51,7 @@ UBYTE is_square_attacked(UBYTE sq, UBYTE side) {
 
     // Check Kings
     for (i = 0; i < 8; i++) {
-        UBYTE target = sq - king_offsets[i];
+        uint8_t target = sq - king_offsets[i];
         if (!IS_OFFBOARD(target)) {
             if (board[target] == (side | KING))
                 return 1;
@@ -114,10 +60,10 @@ UBYTE is_square_attacked(UBYTE sq, UBYTE side) {
 
     // Check Sliders (Rook/Queen)
     for (i = 0; i < 4; i++) {
-        BYTE offset = rook_offsets[i];
-        UBYTE target = sq + offset;
+        int8_t offset = rook_offsets[i];
+        uint8_t target = sq + offset;
         while (!IS_OFFBOARD(target)) {
-            UBYTE piece = board[target];
+            uint8_t piece = board[target];
             if (piece != EMPTY) {
                 if ((piece == (side | ROOK)) || (piece == (side | QUEEN)))
                     return 1;
@@ -129,10 +75,10 @@ UBYTE is_square_attacked(UBYTE sq, UBYTE side) {
 
     // Check Sliders (Bishop/Queen)
     for (i = 0; i < 4; i++) {
-        BYTE offset = bishop_offsets[i];
-        UBYTE target = sq + offset;
+        int8_t offset = bishop_offsets[i];
+        uint8_t target = sq + offset;
         while (!IS_OFFBOARD(target)) {
-            UBYTE piece = board[target];
+            uint8_t piece = board[target];
             if (piece != EMPTY) {
                 if ((piece == (side | BISHOP)) || (piece == (side | QUEEN)))
                     return 1;
@@ -146,7 +92,7 @@ UBYTE is_square_attacked(UBYTE sq, UBYTE side) {
 }
 
 void init_board(void) {
-    UBYTE i;
+    uint8_t i;
     for (i = 0; i < BOARD_SIZE; i++)
         board[i] = EMPTY;
 
@@ -176,11 +122,11 @@ void init_board(void) {
 
 // --- Move Generation & Execution ---
 
-UBYTE generate_moves(Move *moveList) {
-    UBYTE count = 0;
-    UBYTE sq, piece, type, color;
-    BYTE i, offset;
-    UBYTE target_sq;
+uint8_t generate_moves(Move *moveList) {
+    uint8_t count = 0;
+    uint8_t sq, piece, type, color;
+    int8_t i, offset;
+    uint8_t target_sq;
 
     for (sq = 0; sq < BOARD_SIZE; sq++) {
         if (IS_OFFBOARD(sq)) {
@@ -196,8 +142,8 @@ UBYTE generate_moves(Move *moveList) {
         color = GET_COLOR(piece);
 
         if (type == PAWN) {
-            BYTE dir = (color == WHITE) ? 16 : -16;
-            UBYTE start_rank = (color == WHITE) ? 1 : 6;
+            int8_t dir = (color == WHITE) ? 16 : -16;
+            uint8_t start_rank = (color == WHITE) ? 1 : 6;
 
             // Forward 1
             if (board[sq + dir] == EMPTY) {
@@ -216,16 +162,15 @@ UBYTE generate_moves(Move *moveList) {
                     count++;
                 }
             }
-
             // Captures (Normal + En Passant)
-            BYTE cap_offsets[] = { 15, 17 };
+            int8_t cap_offsets[] = { 15, 17 };
             for (i = 0; i < 2; i++) {
                 offset = (color == WHITE) ? cap_offsets[i] : -cap_offsets[i];
                 target_sq = sq + offset;
                 if (IS_OFFBOARD(target_sq))
                     continue;
 
-                UBYTE target = board[target_sq];
+                uint8_t target = board[target_sq];
                 if (target != EMPTY && GET_COLOR(target) != color) {
                     moveList[count].from = sq;
                     moveList[count].to = target_sq;
@@ -310,19 +255,18 @@ UBYTE generate_moves(Move *moveList) {
                 }
             }
         } else {                // Knight, Bishop, Rook, Queen
-            const BYTE *offsets = (type == KNIGHT) ? knight_offsets : (type == ROOK) ? rook_offsets : (type == BISHOP) ? bishop_offsets : NULL;
-            BYTE len = (type == KNIGHT) ? 8 : 4;
+            const int8_t *offsets = (type == KNIGHT) ? knight_offsets : (type == ROOK) ? rook_offsets : (type == BISHOP) ? bishop_offsets : NULL;
+            int8_t len = (type == KNIGHT) ? 8 : 4;
 
             // Queens use both rook and bishop offsets
             if (type == QUEEN) {
                 offsets = rook_offsets;
                 len = 4;
             }
-
             // Loop for Queen (2 passes) or others (1 pass)
-            BYTE passes = (type == QUEEN) ? 2 : 1;
+            int8_t passes = (type == QUEEN) ? 2 : 1;
 
-            BYTE p;
+            int8_t p;
             for (p = 0; p < passes; p++) {
                 if (p == 1)
                     offsets = bishop_offsets;
@@ -334,7 +278,7 @@ UBYTE generate_moves(Move *moveList) {
                     if (type == KNIGHT) {
                         if (IS_OFFBOARD(target_sq))
                             continue;
-                        UBYTE target = board[target_sq];
+                        uint8_t target = board[target_sq];
                         if (target == EMPTY || GET_COLOR(target) != color) {
                             moveList[count].from = sq;
                             moveList[count].to = target_sq;
@@ -344,7 +288,7 @@ UBYTE generate_moves(Move *moveList) {
                         }
                     } else {    // Sliders
                         while (!IS_OFFBOARD(target_sq)) {
-                            UBYTE target = board[target_sq];
+                            uint8_t target = board[target_sq];
                             if (target == EMPTY) {
                                 moveList[count].from = sq;
                                 moveList[count].to = target_sq;
@@ -372,12 +316,12 @@ UBYTE generate_moves(Move *moveList) {
 }
 
 // Returns 0 if legal, 1 if illegal (leaves King in check)
-UBYTE make_move(Move *m) {
-    UBYTE from = m->from;
-    UBYTE to = m->to;
-    UBYTE piece = board[from];
-    UBYTE type = GET_TYPE(piece);
-    UBYTE color = GET_COLOR(piece);
+uint8_t make_move(Move *m) {
+    uint8_t from = m->from;
+    uint8_t to = m->to;
+    uint8_t piece = board[from];
+    uint8_t type = GET_TYPE(piece);
+    uint8_t color = GET_COLOR(piece);
 
     // Save state
     m->old_castle = castleRights;
@@ -389,7 +333,7 @@ UBYTE make_move(Move *m) {
 
     // Special Moves
     if (m->special == 1) {      // EP
-        UBYTE cap_sq = (color == WHITE) ? to - 16 : to + 16;
+        uint8_t cap_sq = (color == WHITE) ? to - 16 : to + 16;
         board[cap_sq] = EMPTY;
     } else if (m->special == 2) {       // Castling
         if (to == 0x06) {
@@ -406,7 +350,6 @@ UBYTE make_move(Move *m) {
             board[0x70] = EMPTY;
         }
     }
-
     // Update Rights
     if (type == KING) {
         if (color == WHITE)
@@ -425,22 +368,21 @@ UBYTE make_move(Move *m) {
 
     epSquare = 0;
     if (type == PAWN) {
-        int diff = (int) to - (int) from;       // Use int for safety
+        int diff = (int) to - (int) from;
         if (diff == 32 || diff == -32)
             epSquare = (from + to) / 2;
     }
+    // ALWAYS Flip side
+    sideToMove = OPPONENT(sideToMove);
 
-    // Check Legality (Crucial Step)
-    UBYTE myKingSq = 0;
-    UBYTE myKing = color | KING;
+    // Check Legality
+    uint8_t myKingSq = 0;
+    uint8_t myKing = color | KING;
 
-    // Optimization: If the piece moved IS the King, we know where it is.
     if (type == KING) {
         myKingSq = to;
     } else {
-        // Otherwise, scan for it.
-        // We scan specifically for 'myKing' which we constructed cleanly above.
-        for (UBYTE i = 0; i < BOARD_SIZE; i++) {
+        for (uint8_t i = 0; i < BOARD_SIZE; i++) {
             if (!IS_OFFBOARD(i) && board[i] == myKing) {
                 myKingSq = i;
                 break;
@@ -449,12 +391,11 @@ UBYTE make_move(Move *m) {
     }
 
     // Check if attacked by OPPONENT
+    // Note: 'sideToMove' is now the opponent, so we can use it or OPPONENT(color)
     if (is_square_attacked(myKingSq, OPPONENT(color))) {
-        sideToMove = OPPONENT(sideToMove);      // Ensure side is flipped even if returning illegal
-        return 1;               // Illegal
+        return 1;               // Illegal (Side is already flipped, so unmake will fix it)
     }
 
-    sideToMove = OPPONENT(sideToMove);
     return 0;                   // Legal
 }
 
@@ -462,13 +403,13 @@ void unmake_move(Move *m) {
     sideToMove = OPPONENT(sideToMove);  // Swap back
 
     // Restore board
-    UBYTE piece = board[m->to];
+    uint8_t piece = board[m->to];
     board[m->from] = piece;
     board[m->to] = m->captured;
 
     // Handle Special Unmakes
     if (m->special == 1) {      // Restore EP captured pawn
-        UBYTE cap_sq = (sideToMove == WHITE) ? m->to - 16 : m->to + 16;
+        uint8_t cap_sq = (sideToMove == WHITE) ? m->to - 16 : m->to + 16;
         board[cap_sq] = OPPONENT(sideToMove) | PAWN;
         board[m->to] = EMPTY;
     } else if (m->special == 2) {       // Undo Castling Rook
@@ -486,68 +427,62 @@ void unmake_move(Move *m) {
             board[0x73] = EMPTY;
         }
     }
-
     // Restore State
     castleRights = m->old_castle;
     epSquare = m->old_ep;
 }
 
-// --- Test Logic ---
+// Returns 1 if it was checkmate, 0 if stalemate.
+// Call only when no legal moves
+uint8_t checkmate_or_stalemate(void) {
+    // Determine if Checkmate or Stalemate
+    uint8_t myKingSq = 0;
+    uint8_t myKing = sideToMove | KING;
 
-uint32_t nodes;
-
-void perft(UBYTE depth) {
-    if (depth == 0) {
-        nodes++;
-        return;
-    }
-
-    Move moveList[MAX_MOVES];
-    UBYTE i;
-    UBYTE count = generate_moves(moveList);
-
-    for (i = 0; i < count; i++) {
-        if (make_move(&moveList[i]) == 0) {     // Only recurse if legal
-            perft(depth - 1);
-            unmake_move(&moveList[i]);
-        } else {
-            // If illegal, we MUST unmake it to restore board state
-            // (make_move modifies board even if it returns 1)
-            unmake_move(&moveList[i]);
+    // Find King
+    for (uint8_t i = 0; i < BOARD_SIZE; i++) {
+        if (!IS_OFFBOARD(i) && board[i] == myKing) {
+            myKingSq = i;
+            break;
         }
     }
-}
 
-void run_perft_test(UBYTE depth) {
-    nodes = 0;
-    printf("Test Depth: %d... ", (int) depth);
-#ifndef __TARGET_gb
-    fflush(stdout);             // Ensure print before computation
-#endif
-    perft(depth);
-    printf("Nodes: %" PRIu32 "\n", nodes);
-}
-
-int main(void) {
-    init_board();
-
-    printf("Chess Engine - Validator\n");
-
-    run_perft_test(1);          // 20
-    run_perft_test(2);          // 400
-    run_perft_test(3);          // 8,902
-    run_perft_test(4);          // 197,281
-    run_perft_test(5);          // 4,865,609
-
-    // Depth 6 on PC only (takes too long on GB)
-#ifndef __TARGET_gb
-    run_perft_test(6);          // 119,060,324
-#endif
-
-#ifdef __TARGET_gb
-    while (1) {
+    if (is_square_attacked(myKingSq, OPPONENT(sideToMove))) {
+        return 1;
     }
-#else
     return 0;
-#endif
+}
+
+void print_board(void) {
+    int8_t r, c;
+
+    printf("\n");
+    // Loop rows from 8 down to 1 (Rank 7 down to 0 in 0x88 math)
+    for (r = 7; r >= 0; r--) {
+        printf(" %d  ", r + 1); // Rank number
+
+        for (c = 0; c < 8; c++) {
+            uint8_t sq = (r * 16) + c;
+            uint8_t piece = board[sq];
+            char symbol = '.';
+
+            if (piece != EMPTY) {
+                uint8_t type = GET_TYPE(piece);
+                uint8_t color = GET_COLOR(piece);
+
+                // Base symbols for White
+                const char symbols[] = "?PNBRQK";
+                symbol = symbols[type];
+
+                // If Black, convert to lowercase (ASCII math)
+                if (color == BLACK) {
+                    symbol += 32;
+                }
+            }
+            printf("%c ", symbol);
+        }
+        printf("\n");
+    }
+    printf("\n    a b c d e f g h\n");
+    printf("    Side to move: %s\n\n", (sideToMove == WHITE) ? "White" : "Black");
 }
