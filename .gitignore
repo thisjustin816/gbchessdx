@@ -1,3 +1,4 @@
 *~
-*.o
-chess_pc
+/bin/
+/build/
+
