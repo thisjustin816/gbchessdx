@@ -479,10 +479,13 @@ void print_board(void) {
                     symbol += 32;
                 }
             }
-            printf("%c ", symbol);
+            if (c == 7) {
+                printf("%c\n", symbol);
+            } else {
+                printf("%c ", symbol);
+            }
         }
-        printf("\n");
     }
     printf("\n    a b c d e f g h\n");
-    printf("    Side to move: %s\n\n", (sideToMove == WHITE) ? "White" : "Black");
+    printf("%s Eval: %6d\n", (sideToMove == WHITE) ? "White" : "Black", gameScore);
 }
