@@ -16,7 +16,9 @@ OBJDIR_GB   = build/gb
 BINDIR      = bin
 
 # Compilation Flags
-CFLAGS_HOST = -O3 -Wall
+CFLAGS_HOST = -O3 -g \
+    -Wall -Wextra -Wshadow -Wconversion \
+    -fsanitize=address -fsanitize=undefined -static-libasan
 # LCC flags: -Wm-yn="NAME" names the ROM, -Wl-j prints the map
 CFLAGS_GB   = 
 
