@@ -27,6 +27,7 @@ void play_full_game(void) {
 #endif
 
     init_board();
+    init_game_history();
     print_board();
 #ifdef __TARGET_gb
     cls();
@@ -46,6 +47,8 @@ void play_full_game(void) {
         }
 
         make_move(&best);
+        record_history();
+        // Record it in permanent history
 
 #ifdef __TARGET_gb
         gotoxy(0, 0);

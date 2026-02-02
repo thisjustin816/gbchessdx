@@ -13,6 +13,34 @@
 // We use a global stack to avoid blowing the CPU stack with recursion.
 Move global_move_stack[STACK_SIZE];
 
+// History of game hashes to detect repetition
+uint16_t game_history[256];
+uint8_t game_ply = 0;
+
+// Call this before the game loop starts
+void init_game_history(void) {
+    game_ply = 0;
+    // Add the starting position to history
+    game_history[game_ply] = posHash;
+    game_ply++;
+}
+
+// Call this after doing a move
+void record_history(void) {
+    game_history[game_ply] = posHash;
+    game_ply++;
+}
+
+uint8_t is_repetition(void) {
+    // Scan backwards. If we find the current posHash, it's a repetition.
+    // (In real chess it's 3-fold, but for this engine 1 repetition is enough to prune)
+    for (uint8_t i = 0; i < game_ply; i++) {
+        if (game_history[i] == posHash)
+            return 1;
+    }
+    return 0;
+}
+
 // Helper to calculate MVV/LVA score for move ordering
 // (Most Valuable Victim - Least Valuable Aggressor)
 // E.g., Pawn captures Queen is huge. Queen captures Pawn is small.
@@ -111,6 +139,22 @@ int16_t quiescence(int16_t alpha, int16_t beta, uint16_t ply_offset) {
 
 // --- Negamax with Alpha-Beta ---
 int16_t negamax(uint8_t depth, int16_t alpha, int16_t beta, uint16_t ply_offset) {
+    // Repetition Check
+    // If this position has happened before in the game, it's a DRAW (Score 0).
+    if (is_repetition()) {
+        // Get the static evaluation for the side to move
+        int16_t current_eval = (sideToMove == WHITE) ? gameScore : -gameScore;
+
+        // SMART CONTEMPT:
+        // If we are losing (score < 0), we should happily accept a draw (0).
+        // If we are winning or equal, a draw is a failure, so we apply the penalty.
+
+        if (current_eval < 0) {
+            return 0;           // Take the lifeline!
+        } else {
+            return -CONTEMPT_FACTOR;    // Avoid the draw, try to win.
+        }
+    }
     // Leaf Node: Drop into Quiescence Search
     if (depth == 0) {
         return quiescence(alpha, beta, ply_offset);

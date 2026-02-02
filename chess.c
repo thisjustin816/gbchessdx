@@ -444,6 +444,8 @@ uint8_t make_move(Move *m) {
         if (diff == 32 || diff == -32)
             epSquare = (from + to) / 2;
     }
+    // Flip Side Hash
+    posHash ^= 0xFFFF;
     // ALWAYS Flip side
     sideToMove = OPPONENT(sideToMove);
 
@@ -472,6 +474,9 @@ uint8_t make_move(Move *m) {
 }
 
 void unmake_move(Move *m) {
+    // Flip Side Hash Back
+    posHash ^= 0xFFFF;
+
     sideToMove = OPPONENT(sideToMove);  // Swap back
 
     uint8_t piece = board[m->to];       // The piece that moved

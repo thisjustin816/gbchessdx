@@ -9,8 +9,18 @@
 #define INFINITY 20000
 #define MATE_SCORE 10000
 
+// Penalty for drawing. 
+// 20 centipawns means "I would rather be slightly worse (-19) than draw (-20)"
+#define CONTEMPT_FACTOR 20
+
 // Main Interface
 // Returns the best move found for the current 'sideToMove'
 Move search_best_move(uint8_t depth);
+
+// Call this before the game loop starts
+void init_game_history(void);
+
+// Call this after doing a move
+void record_history(void);
 
 #endif

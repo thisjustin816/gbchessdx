@@ -3,6 +3,7 @@
 #include "eval.h"
 
 int16_t gameScore = 0;
+uint16_t posHash;               // Global Position Hash
 
 // --- Material Values ---
 // P, N, B, R, Q, K
@@ -86,6 +87,12 @@ const int8_t *get_pst(uint8_t type) {
     }
 }
 
+// Simple hash function to mix piece and square into a 16-bit key
+uint16_t get_hash_key(uint8_t piece, uint8_t sq) {
+    // Arbitrary large primes to scramble the bits
+    return (uint16_t) piece *(sq + 1) * 44203 + 0xACE1;
+}
+
 // Get value of a piece at a specific location
 int16_t get_piece_value(uint8_t piece, uint8_t sq) {
     uint8_t type = GET_TYPE(piece);
@@ -110,12 +117,16 @@ int16_t get_piece_value(uint8_t piece, uint8_t sq) {
 
 void init_eval(void) {
     gameScore = 0;
+    posHash = 0;
     // Iterate over 0x88 board
     for (uint8_t i = 0; i < BOARD_SIZE; i++) {
         if (!IS_OFFBOARD(i) && board[i] != EMPTY) {
             eval_add_piece(board[i], i);
         }
     }
+    // Add side to move to hash (assuming init_board sets sideToMove before calling this)
+    if (sideToMove == BLACK)
+        posHash ^= 0xFFFF;
 }
 
 // Add a piece's value to the global score
@@ -126,6 +137,9 @@ void eval_add_piece(uint8_t piece, uint8_t sq) {
     } else {
         gameScore -= val;
     }
+    // Update Hash
+    posHash ^= get_hash_key(piece, sq);
+
 }
 
 // Remove a piece's value
@@ -136,6 +150,8 @@ void eval_remove_piece(uint8_t piece, uint8_t sq) {
     } else {
         gameScore += val;
     }
+    // Update Hash
+    posHash ^= get_hash_key(piece, sq);
 }
 
 // Optimization: Moving is just Remove(old) + Add(new)

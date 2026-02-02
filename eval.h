@@ -18,5 +18,6 @@ void eval_move_piece(uint8_t piece, uint8_t from, uint8_t to);
 
 // Data
 extern const int16_t material_value[];
+extern uint16_t posHash;        // Global Position Hash
 
 #endif
