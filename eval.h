@@ -16,4 +16,7 @@ void eval_add_piece(uint8_t piece, uint8_t sq);
 void eval_remove_piece(uint8_t piece, uint8_t sq);
 void eval_move_piece(uint8_t piece, uint8_t from, uint8_t to);
 
+// Data
+extern const int16_t material_value[];
+
 #endif
