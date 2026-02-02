@@ -90,7 +90,7 @@ const int8_t *get_pst(uint8_t type) {
 // Simple hash function to mix piece and square into a 16-bit key
 uint16_t get_hash_key(uint8_t piece, uint8_t sq) {
     // Arbitrary large primes to scramble the bits
-    return (uint16_t) piece *(sq + 1) * 44203 + 0xACE1;
+    return (uint16_t) (piece * (sq + 1) * 44203 + 0xACE1);
 }
 
 // Get value of a piece at a specific location

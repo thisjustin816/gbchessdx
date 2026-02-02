@@ -43,7 +43,7 @@ uint8_t is_square_attacked(uint8_t sq, uint8_t side) {
     // Check Knights
     uint8_t i;
     for (i = 0; i < 8; i++) {
-        uint8_t target = sq - knight_offsets[i];        // Reverse offset check
+        uint8_t target = (uint8_t) (sq - knight_offsets[i]);    // Reverse offset check
         if (!IS_OFFBOARD(target)) {
             if (board[target] == (side | KNIGHT))
                 return 1;
@@ -52,7 +52,7 @@ uint8_t is_square_attacked(uint8_t sq, uint8_t side) {
 
     // Check Kings
     for (i = 0; i < 8; i++) {
-        uint8_t target = sq - king_offsets[i];
+        uint8_t target = (uint8_t) (sq - king_offsets[i]);
         if (!IS_OFFBOARD(target)) {
             if (board[target] == (side | KING))
                 return 1;
@@ -62,7 +62,7 @@ uint8_t is_square_attacked(uint8_t sq, uint8_t side) {
     // Check Sliders (Rook/Queen)
     for (i = 0; i < 4; i++) {
         int8_t offset = rook_offsets[i];
-        uint8_t target = sq + offset;
+        uint8_t target = (uint8_t) (sq + offset);
         while (!IS_OFFBOARD(target)) {
             uint8_t piece = board[target];
             if (piece != EMPTY) {
@@ -70,14 +70,14 @@ uint8_t is_square_attacked(uint8_t sq, uint8_t side) {
                     return 1;
                 break;          // Blocked by any piece
             }
-            target += offset;
+            target = (uint8_t) (target + offset);
         }
     }
 
     // Check Sliders (Bishop/Queen)
     for (i = 0; i < 4; i++) {
         int8_t offset = bishop_offsets[i];
-        uint8_t target = sq + offset;
+        uint8_t target = (uint8_t) (sq + offset);
         while (!IS_OFFBOARD(target)) {
             uint8_t piece = board[target];
             if (piece != EMPTY) {
@@ -85,7 +85,7 @@ uint8_t is_square_attacked(uint8_t sq, uint8_t side) {
                     return 1;
                 break;          // Blocked
             }
-            target += offset;
+            target = (uint8_t) (target + offset);
         }
     }
 
@@ -154,10 +154,10 @@ uint8_t generate_moves(Move *moveList) {
             // Forward 1
             if (!IS_OFFBOARD(sq + dir) && board[sq + dir] == EMPTY) {
                 moveList[count].from = sq;
-                moveList[count].to = sq + dir;
+                moveList[count].to = (uint8_t) (sq + dir);
                 moveList[count].captured = EMPTY;
                 // Detect Promotion
-                uint8_t dest_rank = (sq + dir) >> 4;
+                uint8_t dest_rank = (uint8_t) ((sq + dir) >> 4);
                 if (dest_rank == 0 || dest_rank == 7) {
                     moveList[count].special = 3;        // 3 = Promotion
                 } else {
@@ -170,7 +170,7 @@ uint8_t generate_moves(Move *moveList) {
                 // Forward 2
                 if ((sq >> 4) == start_rank && board[sq + dir + dir] == EMPTY) {
                     moveList[count].from = sq;
-                    moveList[count].to = sq + dir + dir;
+                    moveList[count].to = (uint8_t) (sq + dir + dir);
                     moveList[count].captured = EMPTY;
                     moveList[count].special = 0;        // EP flag set in make_move logic via distance
                     count++;
@@ -182,7 +182,7 @@ uint8_t generate_moves(Move *moveList) {
             int8_t cap_offsets[] = { 15, 17 };
             for (i = 0; i < 2; i++) {
                 offset = (color == WHITE) ? cap_offsets[i] : -cap_offsets[i];
-                target_sq = sq + offset;
+                target_sq = (uint8_t) (sq + offset);
                 if (IS_OFFBOARD(target_sq))
                     continue;
 
@@ -216,7 +216,7 @@ uint8_t generate_moves(Move *moveList) {
         } else if (type == KING) {
             // Normal Moves
             for (i = 0; i < 8; i++) {
-                target_sq = sq + king_offsets[i];
+                target_sq = (uint8_t) (sq + king_offsets[i]);
                 if (IS_OFFBOARD(target_sq))
                     continue;
                 if (board[target_sq] == EMPTY || GET_COLOR(board[target_sq]) != color) {
@@ -309,7 +309,7 @@ uint8_t generate_moves(Move *moveList) {
 
                 for (i = 0; i < len; i++) {
                     offset = offsets[i];
-                    target_sq = sq + offset;
+                    target_sq = (uint8_t) (sq + offset);
 
                     if (type == KNIGHT) {
                         if (IS_OFFBOARD(target_sq))
@@ -347,7 +347,7 @@ uint8_t generate_moves(Move *moveList) {
                                 }
                                 break;
                             }
-                            target_sq += offset;
+                            target_sq = (uint8_t) (target_sq + offset);
                         }
                     }
                 }
@@ -425,24 +425,24 @@ uint8_t make_move(Move *m) {
     // Update Rights
     if (type == KING) {
         if (color == WHITE)
-            castleRights &= ~(WK_CASTLE | WQ_CASTLE);
+            castleRights &= (uint8_t) ~ (WK_CASTLE | WQ_CASTLE);
         else
-            castleRights &= ~(BK_CASTLE | BQ_CASTLE);
+            castleRights &= (uint8_t) ~ (BK_CASTLE | BQ_CASTLE);
     }
     if (from == 0x00 || to == 0x00)
-        castleRights &= ~WQ_CASTLE;
+        castleRights &= (uint8_t) ~ WQ_CASTLE;
     if (from == 0x07 || to == 0x07)
-        castleRights &= ~WK_CASTLE;
+        castleRights &= (uint8_t) ~ WK_CASTLE;
     if (from == 0x70 || to == 0x70)
-        castleRights &= ~BQ_CASTLE;
+        castleRights &= (uint8_t) ~ BQ_CASTLE;
     if (from == 0x77 || to == 0x77)
-        castleRights &= ~BK_CASTLE;
+        castleRights &= (uint8_t) ~ BK_CASTLE;
 
     epSquare = 0;
     if (type == PAWN) {
         int diff = (int) to - (int) from;
         if (diff == 32 || diff == -32)
-            epSquare = (from + to) / 2;
+            epSquare = (uint8_t) ((from + to) / 2);
     }
     // Flip Side Hash
     posHash ^= 0xFFFF;
@@ -568,7 +568,7 @@ void print_board(void) {
         printf(" %d  ", r + 1); // Rank number
 
         for (c = 0; c < 8; c++) {
-            uint8_t sq = (r * 16) + c;
+            uint8_t sq = (uint8_t) ((r * 16) + c);
             uint8_t piece = board[sq];
             char symbol = '.';
 

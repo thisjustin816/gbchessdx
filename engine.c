@@ -53,7 +53,7 @@ int16_t score_move_ordering(Move *m) {
         int16_t victim = material_value[GET_TYPE(m->captured)];
         int16_t aggressor = material_value[GET_TYPE(board[m->from])];   // Note: board not moved yet
 
-        return 1000 + (victim * 10) - aggressor;
+        return (int16_t) (1000 + (victim * 10) - aggressor);
     }
     // TODO: Add History Heuristic or PST bonus here for non-captures
     return 0;
@@ -202,7 +202,7 @@ int16_t negamax(uint8_t depth, int16_t alpha, int16_t beta, uint16_t ply_offset)
     if (legal_moves_found == 0) {
         if (checkmate_or_stalemate()) {
             // Checkmate: Return huge negative score (adjusted for depth to prefer faster mates)
-            return -MATE_SCORE + ply_offset;    // +ply_offset favors mating sooner
+            return (int16_t) (-MATE_SCORE + ply_offset);        // +ply_offset favors mating sooner
         } else {
             // Stalemate
             return 0;
@@ -219,7 +219,7 @@ void shuffle_root_moves(Move *moves, uint8_t count) {
 
     for (uint8_t i = count - 1; i > 0; i--) {
         // Simple random index from 0 to i
-        uint8_t j = rand() % (i + 1);
+        uint8_t j = (uint8_t) (rand() % (i + 1));
 
         // Swap
         Move temp = moves[i];

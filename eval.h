@@ -8,7 +8,7 @@ extern int16_t gameScore;
 // Helper to convert 0x88 0-127 index to 0-63 linear index
 // (sq & 0xF0) >> 1 calculates row * 8
 // (sq & 0x07) calculates col
-#define SQ64(sq) (((sq & 0xF0) >> 1) | (sq & 0x07))
+#define SQ64(sq) ((uint8_t)((((sq) & 0xF0) >> 1) | ((sq) & 0x07)))
 
 // Functions
 void init_eval(void);

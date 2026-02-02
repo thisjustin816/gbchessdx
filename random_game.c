@@ -20,7 +20,7 @@ void play_random_game(void) {
     seed |= (uint16_t) LY_REG << 8;
     initrand(seed);
 #else
-    srand(time(NULL));
+    srand((unsigned int) time(NULL));
 #endif
 
     init_board();
