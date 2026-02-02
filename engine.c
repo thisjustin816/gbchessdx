@@ -19,7 +19,7 @@ int16_t score_move_ordering(Move *m) {
         int16_t victim = material_value[GET_TYPE(m->captured)];
         int16_t aggressor = material_value[GET_TYPE(board[m->from])];   // Note: board not moved yet
 
-        return (victim * 10) - aggressor;
+        return 1000 + (victim * 10) - aggressor;
     }
     // TODO: Add History Heuristic or PST bonus here for non-captures
     return 0;
@@ -130,7 +130,7 @@ int16_t negamax(uint8_t depth, int16_t alpha, int16_t beta, uint16_t ply_offset)
         Move *m = &plyMoves[i];
 
         if (make_move(m) == 0) {
-            legal_moves_found++;
+            legal_moves_found = 1;
 
             // Search
             int16_t score = -negamax(depth - 1, -beta, -alpha, ply_offset + MAX_PLY_MOVES);
@@ -162,49 +162,74 @@ int16_t negamax(uint8_t depth, int16_t alpha, int16_t beta, uint16_t ply_offset)
     return alpha;
 }
 
-// --- Root Search ---
-Move search_best_move(uint8_t depth) {
+// --- Root Search with Iterative Deepening ---
+
+Move search_best_move(uint8_t max_depth) {
     Move bestMove;
-    // Defaults if no move found (shouldn't happen unless mated)
-    bestMove.from = 0;
-    bestMove.to = 0;
+    bestMove.special = 255;     // Sentinel for "no move found yet"
 
-    int16_t alpha = -INFINITY;
-    int16_t beta = INFINITY;
+    // Generate Root Moves ONCE
+    // We will reuse this list for every iteration to save generating time.
+    Move *rootMoves = &global_move_stack[0];
+    uint8_t count = generate_moves(rootMoves);
 
-    Move *plyMoves = &global_move_stack[0];
-    uint8_t count = generate_moves(plyMoves);
-    uint8_t legal_found = 0;
+    if (count == 0)
+        return bestMove;        // Game Over check
 
-    // Root loop
-    for (uint8_t i = 0; i < count; i++) {
-        pick_next_move(i, count, plyMoves);
-        Move *m = &plyMoves[i];
+    // Iterative Deepening Loop
+    for (uint8_t current_depth = 1; current_depth <= max_depth; current_depth++) {
 
-        if (make_move(m) == 0) {
-            legal_found = 1;
+        int16_t alpha = -INFINITY;
+        int16_t beta = INFINITY;
+        Move bestMoveThisIter;
+        bestMoveThisIter.special = 255;
 
-            // Call Negamax
-            int16_t score = -negamax(depth - 1, -beta, -alpha, MAX_PLY_MOVES);
-
-            unmake_move(m);
-
-            // Simple Output for debugging
-            // printf("Move %d->%d Score: %d\n", m->from, m->to, score);
-
-            if (score > alpha) {
-                alpha = score;
-                bestMove = *m;
+        // Optimization: Root Move Ordering
+        // If we found a best move in the PREVIOUS iteration (depth - 1),
+        // swap it to the front (index 0) so we search it first.
+        if (current_depth > 1 && bestMove.special != 255) {
+            for (uint8_t i = 0; i < count; i++) {
+                if (rootMoves[i].from == bestMove.from && rootMoves[i].to == bestMove.to) {
+                    // Swap to front
+                    Move temp = rootMoves[0];
+                    rootMoves[0] = rootMoves[i];
+                    rootMoves[i] = temp;
+                    break;
+                }
             }
-        } else {
-            unmake_move(m);
         }
-    }
+        // Search Loop (for current depth)
+        for (uint8_t i = 0; i < count; i++) {
+            // For root moves AFTER the first one (index 0), we still want to sort by capture score
+            if (i > 0)
+                pick_next_move(i, count, rootMoves);
 
-    // Handle Game Over at root
-    if (legal_found == 0) {
-        // Handle external logic for game over
-        bestMove.special = 255; // Marker for "No Move"
+            Move *m = &rootMoves[i];
+
+            if (make_move(m) == 0) {
+                // Recursive call
+                int16_t score = -negamax(current_depth - 1, -beta, -alpha, MAX_PLY_MOVES);
+                unmake_move(m);
+
+                if (score > alpha) {
+                    alpha = score;
+                    bestMoveThisIter = *m;
+
+                    // Optional: Print info as we find better moves
+                    // printf("Depth %d: Best %d->%d (%d)\n", current_depth, m->from, m->to, score);
+                }
+            } else {
+                unmake_move(m);
+            }
+        }
+
+        // Update Global Best
+        // Only update if we actually found a legal move this iteration
+        if (bestMoveThisIter.special != 255) {
+            bestMove = bestMoveThisIter;
+        }
+        // TODO: Here you could check a timer. 
+        // If (Time > 5 seconds) break; 
     }
 
     return bestMove;
