@@ -85,12 +85,13 @@ void pick_next_move(uint8_t moveNum, uint8_t count, Move *basePtr) {
 // --- Quiescence Search ---
 // Only searches captures to stabilize the evaluation (avoids horizon effect)
 int16_t quiescence(int16_t alpha, int16_t beta, uint16_t ply_offset) {
+    int16_t eval = get_final_eval();
+
     // Stand Pat: If we do nothing, what is the score?
     // We assume the side to move can at least choose "not to move" if they are ahead.
     // (Note: sideToMove is managed by make_move, so eval_score is already relative to board state?
     // No, gameScore is global White-Black. We need to flip it for the current player.)
-
-    int16_t stand_pat = (sideToMove == WHITE) ? gameScore : -gameScore;
+    int16_t stand_pat = (sideToMove == WHITE) ? eval : -eval;
 
     if (stand_pat >= beta)
         return beta;
@@ -143,7 +144,8 @@ int16_t negamax(uint8_t depth, int16_t alpha, int16_t beta, uint16_t ply_offset)
     // If this position has happened before in the game, it's a DRAW (Score 0).
     if (is_repetition()) {
         // Get the static evaluation for the side to move
-        int16_t current_eval = (sideToMove == WHITE) ? gameScore : -gameScore;
+        int16_t eval = get_final_eval();
+        int16_t current_eval = (sideToMove == WHITE) ? eval : -eval;
 
         // SMART CONTEMPT:
         // If we are losing (score < 0), we should happily accept a draw (0).

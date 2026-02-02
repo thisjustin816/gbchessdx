@@ -16,6 +16,9 @@ void eval_add_piece(uint8_t piece, uint8_t sq);
 void eval_remove_piece(uint8_t piece, uint8_t sq);
 void eval_move_piece(uint8_t piece, uint8_t from, uint8_t to);
 
+// Get the full evaluation including Mop-Up bonuses
+int16_t get_final_eval(void);
+
 // Data
 extern const int16_t material_value[];
 extern uint16_t posHash;        // Global Position Hash

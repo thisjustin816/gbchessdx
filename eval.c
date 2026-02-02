@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdlib.h>
 #include "chess.h"
 #include "eval.h"
 
@@ -160,4 +161,63 @@ void eval_remove_piece(uint8_t piece, uint8_t sq) {
 void eval_move_piece(uint8_t piece, uint8_t from, uint8_t to) {
     eval_remove_piece(piece, from);
     eval_add_piece(piece, to);
+}
+
+// Helper: Manhattan distance (moves to reach square)
+uint8_t distance(uint8_t sq1, uint8_t sq2) {
+    int8_t r1 = sq1 >> 4, c1 = sq1 & 7;
+    int8_t r2 = sq2 >> 4, c2 = sq2 & 7;
+    return abs(r1 - r2) + abs(c1 - c2);
+}
+
+// Helper: Distance from center (for pushing king to edge)
+// Center is 3.5, We scale up to avoid floats.
+uint8_t dist_from_center(uint8_t sq) {
+    int8_t r = sq >> 4, c = sq & 7;
+    // Rank dist: 0->3, 1->2, 2->1, 3->0, 4->0, 5->1 ...
+    int8_t r_dist = abs(r * 2 - 7);
+    int8_t c_dist = abs(c * 2 - 7);
+    return r_dist + c_dist;
+}
+
+int16_t get_final_eval(void) {
+    int16_t score = gameScore;
+
+    // Mop-Up Evaluation
+    // Only apply if one side has a significant winning advantage (> 5 Pawns)
+    if (score > 500 || score < -500) {
+        uint8_t wKing = 0, bKing = 0;
+
+        // Find Kings (We scan board because we don't track them yet. 
+        // This is okay because we ONLY do it in endgames).
+        for (uint8_t i = 0; i < BOARD_SIZE; i++) {
+            if (IS_OFFBOARD(i))
+                continue;
+            if (board[i] == (WHITE | KING))
+                wKing = i;
+            if (board[i] == (BLACK | KING))
+                bKing = i;
+        }
+
+        int16_t mop_up_score = 0;
+
+        // Encourage pushing Losing King to edge
+        // Encourage Winning King to close in
+        uint8_t losingKing = (score > 0) ? bKing : wKing;
+        uint8_t winningKing = (score > 0) ? wKing : bKing;
+
+        // Push losing king to edge (max 14 pts * 10 = 140)
+        mop_up_score += dist_from_center(losingKing) * 10;
+
+        // Bring winning king closer (max 14 dist. Bonus = (14 - dist) * 4)
+        mop_up_score += (14 - distance(winningKing, losingKing)) * 4;
+
+        // Apply bonus to the winning side
+        if (score > 0)
+            score += mop_up_score;
+        else
+            score -= mop_up_score;
+    }
+
+    return score;
 }
