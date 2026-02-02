@@ -152,7 +152,7 @@ uint8_t generate_moves(Move *moveList) {
             uint8_t start_rank = (color == WHITE) ? 1 : 6;
 
             // Forward 1
-            if (board[sq + dir] == EMPTY) {
+            if (!IS_OFFBOARD(sq + dir) && board[sq + dir] == EMPTY) {
                 moveList[count].from = sq;
                 moveList[count].to = sq + dir;
                 moveList[count].captured = EMPTY;
