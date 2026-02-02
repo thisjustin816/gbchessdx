@@ -156,7 +156,13 @@ uint8_t generate_moves(Move *moveList) {
                 moveList[count].from = sq;
                 moveList[count].to = sq + dir;
                 moveList[count].captured = EMPTY;
-                moveList[count].special = 0;
+                // Detect Promotion
+                uint8_t dest_rank = (sq + dir) >> 4;
+                if (dest_rank == 0 || dest_rank == 7) {
+                    moveList[count].special = 3;        // 3 = Promotion
+                } else {
+                    moveList[count].special = 0;
+                }
                 count++;
                 if (count >= MAX_MOVES)
                     return count;
@@ -185,7 +191,13 @@ uint8_t generate_moves(Move *moveList) {
                     moveList[count].from = sq;
                     moveList[count].to = target_sq;
                     moveList[count].captured = target;
-                    moveList[count].special = 0;
+                    // Detect Promotion
+                    uint8_t dest_rank = target_sq >> 4;
+                    if (dest_rank == 0 || dest_rank == 7) {
+                        moveList[count].special = 3;    // 3 = Promotion
+                    } else {
+                        moveList[count].special = 0;
+                    }
                     count++;
                     if (count >= MAX_MOVES)
                         return count;
@@ -400,6 +412,15 @@ uint8_t make_move(Move *m) {
             board[0x70] = EMPTY;
             eval_move_piece(rook, 0x70, 0x73);
         }
+    } else if (m->special == 3) {       // Promotion
+        // The pawn has already moved to 'to' by the standard logic above.
+        // Now transform it into a Queen.
+        uint8_t queen = color | QUEEN;
+        board[to] = queen;
+
+        // Update Eval: Remove the Pawn value we just added, add Queen value instead
+        eval_remove_piece(color | PAWN, to);
+        eval_add_piece(queen, to);
     }
     // Update Rights
     if (type == KING) {
@@ -496,6 +517,16 @@ void unmake_move(Move *m) {
             board[0x73] = EMPTY;
             eval_move_piece(rook, 0x73, 0x70);
         }
+    } else if (m->special == 3) {       // Undo Promotion
+        // The standard logic above moved the piece back from 'to' to 'from'.
+        // But that piece was a Queen. We need to turn it back into a Pawn.
+
+        uint8_t pawn = sideToMove | PAWN;       // sideToMove is already flipped back
+        board[m->from] = pawn;
+
+        // Update Eval: Remove the Queen, add the Pawn
+        eval_remove_piece(sideToMove | QUEEN, m->from);
+        eval_add_piece(pawn, m->from);
     }
     // Restore State
     castleRights = m->old_castle;
