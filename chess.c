@@ -132,6 +132,9 @@ uint8_t generate_moves(Move *moveList) {
     uint8_t target_sq;
 
     for (sq = 0; sq < BOARD_SIZE; sq++) {
+        if (count >= MAX_MOVES)
+            return count;
+
         if (IS_OFFBOARD(sq)) {
             sq += 7;
             continue;
@@ -155,6 +158,8 @@ uint8_t generate_moves(Move *moveList) {
                 moveList[count].captured = EMPTY;
                 moveList[count].special = 0;
                 count++;
+                if (count >= MAX_MOVES)
+                    return count;
 
                 // Forward 2
                 if ((sq >> 4) == start_rank && board[sq + dir + dir] == EMPTY) {
@@ -163,6 +168,8 @@ uint8_t generate_moves(Move *moveList) {
                     moveList[count].captured = EMPTY;
                     moveList[count].special = 0;        // EP flag set in make_move logic via distance
                     count++;
+                    if (count >= MAX_MOVES)
+                        return count;
                 }
             }
             // Captures (Normal + En Passant)
@@ -180,6 +187,8 @@ uint8_t generate_moves(Move *moveList) {
                     moveList[count].captured = target;
                     moveList[count].special = 0;
                     count++;
+                    if (count >= MAX_MOVES)
+                        return count;
                 }
                 // En Passant
                 else if (target_sq == epSquare && epSquare != 0) {
@@ -188,6 +197,8 @@ uint8_t generate_moves(Move *moveList) {
                     moveList[count].captured = EMPTY;   // Capture logic handled specially
                     moveList[count].special = 1;        // Mark as EP
                     count++;
+                    if (count >= MAX_MOVES)
+                        return count;
                 }
             }
         } else if (type == KING) {
@@ -202,6 +213,8 @@ uint8_t generate_moves(Move *moveList) {
                     moveList[count].captured = board[target_sq];
                     moveList[count].special = 0;
                     count++;
+                    if (count >= MAX_MOVES)
+                        return count;
                 }
             }
 
@@ -219,6 +232,8 @@ uint8_t generate_moves(Move *moveList) {
                             moveList[count].captured = EMPTY;
                             moveList[count].special = 2;
                             count++;
+                            if (count >= MAX_MOVES)
+                                return count;
                         }
                     }
                     // Queenside
@@ -229,6 +244,8 @@ uint8_t generate_moves(Move *moveList) {
                             moveList[count].captured = EMPTY;
                             moveList[count].special = 2;
                             count++;
+                            if (count >= MAX_MOVES)
+                                return count;
                         }
                     }
                 }
@@ -243,6 +260,8 @@ uint8_t generate_moves(Move *moveList) {
                             moveList[count].captured = EMPTY;
                             moveList[count].special = 2;
                             count++;
+                            if (count >= MAX_MOVES)
+                                return count;
                         }
                     }
                     // Queenside
@@ -253,6 +272,8 @@ uint8_t generate_moves(Move *moveList) {
                             moveList[count].captured = EMPTY;
                             moveList[count].special = 2;
                             count++;
+                            if (count >= MAX_MOVES)
+                                return count;
                         }
                     }
                 }
@@ -288,6 +309,8 @@ uint8_t generate_moves(Move *moveList) {
                             moveList[count].captured = target;
                             moveList[count].special = 0;
                             count++;
+                            if (count >= MAX_MOVES)
+                                return count;
                         }
                     } else {    // Sliders
                         while (!IS_OFFBOARD(target_sq)) {
@@ -298,6 +321,8 @@ uint8_t generate_moves(Move *moveList) {
                                 moveList[count].captured = EMPTY;
                                 moveList[count].special = 0;
                                 count++;
+                                if (count >= MAX_MOVES)
+                                    return count;
                             } else {
                                 if (GET_COLOR(target) != color) {
                                     moveList[count].from = sq;
@@ -305,6 +330,8 @@ uint8_t generate_moves(Move *moveList) {
                                     moveList[count].captured = target;
                                     moveList[count].special = 0;
                                     count++;
+                                    if (count >= MAX_MOVES)
+                                        return count;
                                 }
                                 break;
                             }

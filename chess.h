@@ -1,7 +1,7 @@
 // --- Constants & Definitions ---
 
 #define BOARD_SIZE 128
-#define MAX_MOVES 256
+#define MAX_MOVES 80
 
 // Pieces
 #define EMPTY 0
