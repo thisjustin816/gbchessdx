@@ -36,7 +36,12 @@ void play_full_game(void) {
         Move best = search_best_move(3);        // Depth 3 (Main) + Quiescence
 
         if (best.special == 255) {
-            printf("Game Over!\n");
+            printf("\n--- GAME OVER ---\n");
+            if (checkmate_or_stalemate()) {
+                printf("CHECKMATE! %s Wins.\n", (sideToMove == WHITE) ? "Black" : "White");
+            } else {
+                printf("STALEMATE! It's a draw.\n");
+            }
             return;
         }
 
