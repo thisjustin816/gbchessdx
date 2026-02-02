@@ -28,7 +28,7 @@ ALL_SRC = $(wildcard *.c *.h)
 # ==========================================
 
 # The shared logic files
-COMMON_SRC = chess.c
+COMMON_SRC = chess.c eval.c
 
 # Define the binaries here
 
@@ -42,12 +42,17 @@ RND_SRC       = random_game.c
 RND_OBJ_HOST   = $(addprefix $(OBJDIR_HOST)/, $(COMMON_SRC:.c=.o) $(RND_SRC:.c=.o))
 RND_OBJ_GB     = $(addprefix $(OBJDIR_GB)/,   $(COMMON_SRC:.c=.o) $(RND_SRC:.c=.o))
 
+# Oneply Game
+ONEPLY_SRC       = one_ply.c
+ONEPLY_OBJ_HOST   = $(addprefix $(OBJDIR_HOST)/, $(COMMON_SRC:.c=.o) $(ONEPLY_SRC:.c=.o))
+ONEPLY_OBJ_GB     = $(addprefix $(OBJDIR_GB)/,   $(COMMON_SRC:.c=.o) $(ONEPLY_SRC:.c=.o))
+
 # Main Rules
 all: host gb
 
 # Group targets
-host: $(BINDIR)/perft $(BINDIR)/random_game
-gb:   $(BINDIR)/perft.gb $(BINDIR)/random_game.gb
+host: $(BINDIR)/perft $(BINDIR)/random_game $(BINDIR)/one_ply
+gb:   $(BINDIR)/perft.gb $(BINDIR)/random_game.gb $(BINDIR)/one_ply.gb
 
 # ==========================================
 # Linking Rules
@@ -63,6 +68,10 @@ $(BINDIR)/random_game: $(RND_OBJ_HOST)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_HOST) -o $@ $^
 
+$(BINDIR)/one_ply: $(ONEPLY_OBJ_HOST)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_HOST) -o $@ $^
+
 # --- Game Boy Linking ---
 
 $(BINDIR)/perft.gb: $(PERFT_OBJ_GB)
@@ -70,6 +79,10 @@ $(BINDIR)/perft.gb: $(PERFT_OBJ_GB)
 	$(LCC) $(CFLAGS_GB) -o $@ $^
 
 $(BINDIR)/random_game.gb: $(RND_OBJ_GB)
+	@mkdir -p $(@D)
+	$(LCC) $(CFLAGS_GB) -o $@ $^
+
+$(BINDIR)/one_ply.gb: $(ONEPLY_OBJ_GB)
 	@mkdir -p $(@D)
 	$(LCC) $(CFLAGS_GB) -o $@ $^
 

@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "chess.h"
+#include "eval.h"
 
 // Global State
 uint8_t board[BOARD_SIZE];
@@ -118,6 +119,8 @@ void init_board(void) {
     sideToMove = WHITE;
     castleRights = WK_CASTLE | WQ_CASTLE | BK_CASTLE | BQ_CASTLE;
     epSquare = 0;
+
+    init_eval();                // Initialize Evaluation
 }
 
 // --- Move Generation & Execution ---
@@ -327,27 +330,48 @@ uint8_t make_move(Move *m) {
     m->old_castle = castleRights;
     m->old_ep = epSquare;
 
+    // Remove moving piece from 'from'
+    eval_remove_piece(piece, from);
+
+    // If capture, remove captured piece from 'to'
+    if (m->captured != EMPTY) {
+        eval_remove_piece(m->captured, to);
+    }
     // Move Piece
     board[to] = piece;
     board[from] = EMPTY;
 
+    // Add moving piece to 'to'
+    eval_add_piece(piece, to);
+
     // Special Moves
     if (m->special == 1) {      // EP
         uint8_t cap_sq = (color == WHITE) ? to - 16 : to + 16;
+        uint8_t captured_pawn = OPPONENT(color) | PAWN;
         board[cap_sq] = EMPTY;
+
+        // Remove EP captured pawn
+        eval_remove_piece(captured_pawn, cap_sq);
+
     } else if (m->special == 2) {       // Castling
-        if (to == 0x06) {
+        // Move Rook
+        uint8_t rook = color | ROOK;
+        if (to == 0x06) {       // WK Side
             board[0x05] = board[0x07];
             board[0x07] = EMPTY;
-        } else if (to == 0x02) {
+            eval_move_piece(rook, 0x07, 0x05);
+        } else if (to == 0x02) {        // WQ Side
             board[0x03] = board[0x00];
             board[0x00] = EMPTY;
-        } else if (to == 0x76) {
+            eval_move_piece(rook, 0x00, 0x03);
+        } else if (to == 0x76) {        // BK Side
             board[0x75] = board[0x77];
             board[0x77] = EMPTY;
-        } else if (to == 0x72) {
+            eval_move_piece(rook, 0x77, 0x75);
+        } else if (to == 0x72) {        // BQ Side
             board[0x73] = board[0x70];
             board[0x70] = EMPTY;
+            eval_move_piece(rook, 0x70, 0x73);
         }
     }
     // Update Rights
@@ -402,29 +426,48 @@ uint8_t make_move(Move *m) {
 void unmake_move(Move *m) {
     sideToMove = OPPONENT(sideToMove);  // Swap back
 
+    uint8_t piece = board[m->to];       // The piece that moved
+
+    // Reverse move of the piece
+    eval_remove_piece(piece, m->to);
+    eval_add_piece(piece, m->from);
+
     // Restore board
-    uint8_t piece = board[m->to];
     board[m->from] = piece;
     board[m->to] = m->captured;
 
+    // Restore captured piece
+    if (m->captured != EMPTY) {
+        eval_add_piece(m->captured, m->to);
+    }
     // Handle Special Unmakes
     if (m->special == 1) {      // Restore EP captured pawn
         uint8_t cap_sq = (sideToMove == WHITE) ? m->to - 16 : m->to + 16;
-        board[cap_sq] = OPPONENT(sideToMove) | PAWN;
+        uint8_t captured_pawn = OPPONENT(sideToMove) | PAWN;
+        board[cap_sq] = captured_pawn;
         board[m->to] = EMPTY;
+
+        // Restore EP captured pawn
+        eval_add_piece(captured_pawn, cap_sq);
+
     } else if (m->special == 2) {       // Undo Castling Rook
+        uint8_t rook = sideToMove | ROOK;
         if (m->to == 0x06) {
             board[0x07] = board[0x05];
             board[0x05] = EMPTY;
+            eval_move_piece(rook, 0x05, 0x07);
         } else if (m->to == 0x02) {
             board[0x00] = board[0x03];
             board[0x03] = EMPTY;
+            eval_move_piece(rook, 0x03, 0x00);
         } else if (m->to == 0x76) {
             board[0x77] = board[0x75];
             board[0x75] = EMPTY;
+            eval_move_piece(rook, 0x75, 0x77);
         } else if (m->to == 0x72) {
             board[0x70] = board[0x73];
             board[0x73] = EMPTY;
+            eval_move_piece(rook, 0x73, 0x70);
         }
     }
     // Restore State
