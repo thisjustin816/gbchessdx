@@ -3,6 +3,12 @@
 #include "eval.h"
 #include "engine.h"
 
+#ifdef __TARGET_gb
+#include <rand.h>
+#else
+#include <stdlib.h>
+#endif
+
 // --- Global Search Memory ---
 // We use a global stack to avoid blowing the CPU stack with recursion.
 Move global_move_stack[STACK_SIZE];
@@ -162,6 +168,22 @@ int16_t negamax(uint8_t depth, int16_t alpha, int16_t beta, uint16_t ply_offset)
     return alpha;
 }
 
+// Shuffle the move list to add randomness to the game
+void shuffle_root_moves(Move *moves, uint8_t count) {
+    if (count < 2)
+        return;
+
+    for (uint8_t i = count - 1; i > 0; i--) {
+        // Simple random index from 0 to i
+        uint8_t j = rand() % (i + 1);
+
+        // Swap
+        Move temp = moves[i];
+        moves[i] = moves[j];
+        moves[j] = temp;
+    }
+}
+
 // --- Root Search with Iterative Deepening ---
 
 Move search_best_move(uint8_t max_depth) {
@@ -175,6 +197,10 @@ Move search_best_move(uint8_t max_depth) {
 
     if (count == 0)
         return bestMove;        // Game Over check
+
+    // Shuffle the root moves so we don't play the same game every time.
+    // We only do this once, before Depth 1, so it doesn't break the sorting later.
+    shuffle_root_moves(rootMoves, count);
 
     // Iterative Deepening Loop
     for (uint8_t current_depth = 1; current_depth <= max_depth; current_depth++) {
