@@ -23,7 +23,11 @@ void play_full_game(void) {
     seed |= (uint16_t) LY_REG << 8;
     initrand(seed);
 #else
-    srand((unsigned int) time(NULL));
+    struct timespec ts;
+    timespec_get(&ts, TIME_UTC);
+    unsigned int seed = (unsigned int)(ts.tv_nsec);
+    printf("Seed = %u\n", seed);
+    srand(seed); 
 #endif
 
     init_board();
