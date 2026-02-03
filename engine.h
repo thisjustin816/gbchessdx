@@ -23,4 +23,7 @@ void init_game_history(void);
 // Call this after doing a move
 void record_history(void);
 
+// Ply of game we are on
+extern uint8_t game_ply;
+
 #endif
