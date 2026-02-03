@@ -45,6 +45,11 @@ uint8_t is_repetition(void) {
 // (Most Valuable Victim - Least Valuable Aggressor)
 // E.g., Pawn captures Queen is huge. Queen captures Pawn is small.
 int16_t score_move_ordering(Move *m) {
+    // Promotions (Highest Priority)
+    // We want to search these before anything else!
+    if (m->special == 3) {
+        return 20000;           // Massive score to ensure it's first
+    }
     if (m->captured != EMPTY) {
         // Victim Value: 10 * Piece Value (to prioritize capturing big things)
         // Aggressor Value: Subtract Piece Value (to prioritize risking small things)
@@ -114,8 +119,8 @@ int16_t quiescence(int16_t alpha, int16_t beta, uint16_t ply_offset) {
         pick_next_move(i, count, plyMoves);
         Move *m = &plyMoves[i];
 
-        // QS Optimization: Only consider CAPTURES
-        if (m->captured == EMPTY)
+        // QS: Check Captures OR Promotions
+        if (m->captured == EMPTY && m->special != 3)
             continue;
 
         // Delta Pruning (Simplified): If capturing this piece + safety margin
