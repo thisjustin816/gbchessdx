@@ -123,7 +123,7 @@ fmt:
 	@echo "Formatting all .c and .h files..."
 	@for f in $(ALL_SRC); do \
 		echo "Processing $$f..."; \
-		sed -E -i 's/(\/\/.*)[0-9]+\.\s*(.*)/\1\2/' "$$f"; \
+		sed -E -i 's/(\/\/.*)[0-9]+\.\s+(.*)/\1\2/' "$$f"; \
 		indent -kr -brf -nut -l0 "$$f"; \
 	done
 	@echo "Formatting complete."
