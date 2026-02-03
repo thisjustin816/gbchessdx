@@ -4,6 +4,7 @@
 #include "chess.h"
 #include "eval.h"
 #include "engine.h"
+#include "book.h"
 
 #ifdef __TARGET_gb
 #include <gb/gb.h>
@@ -25,9 +26,9 @@ void play_full_game(void) {
 #else
     struct timespec ts;
     timespec_get(&ts, TIME_UTC);
-    unsigned int seed = (unsigned int)(ts.tv_nsec);
+    unsigned int seed = (unsigned int) (ts.tv_nsec);
     printf("Seed = %u\n", seed);
-    srand(seed); 
+    srand(seed);
 #endif
 
     init_board();
@@ -38,7 +39,19 @@ void play_full_game(void) {
 #endif
 
     while (ply < 200) {
-        Move best = search_best_move(3);        // Depth 3 (Main) + Quiescence
+        Move best;
+        uint8_t found_book = get_book_move(&best);
+
+        if (found_book) {
+            printf("Book Move!\n");
+            // We need to ensure 'captured' and 'special' are correct
+            // because our simple book function didn't fully set them (lazy).
+            best.captured = board[best.to];
+            best.special = 0;   // Book moves are rarely En Passant/Castle (unless deep in book)
+        } else {
+            // Standard Search
+            best = search_best_move(3);
+        }
 
         if (best.special == 255) {
             printf("\n--- GAME OVER ---\n");
