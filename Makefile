@@ -54,6 +54,11 @@ FULL_SRC       = full_player.c
 FULL_OBJ_HOST   = $(addprefix $(OBJDIR_HOST)/, $(COMMON_SRC:.c=.o) $(FULL_SRC:.c=.o))
 FULL_OBJ_GB     = $(addprefix $(OBJDIR_GB)/,   $(COMMON_SRC:.c=.o) $(FULL_SRC:.c=.o))
 
+# UCI Game
+UCI_SRC       = uci.c
+UCI_OBJ_HOST   = $(addprefix $(OBJDIR_HOST)/, $(COMMON_SRC:.c=.o) $(UCI_SRC:.c=.o))
+UCI_OBJ_GB     = $(addprefix $(OBJDIR_GB)/,   $(COMMON_SRC:.c=.o) $(UCI_SRC:.c=.o))
+
 # Book_Gen Game
 BOOK_GEN_SRC       = book_gen.c
 BOOK_GEN_COMMON_SRC = chess.c eval.c
@@ -63,7 +68,7 @@ BOOK_GEN_OBJ_HOST   = $(addprefix $(OBJDIR_HOST)/, $(BOOK_GEN_COMMON_SRC:.c=.o) 
 all: host gb
 
 # Group targets
-host: $(BINDIR)/perft $(BINDIR)/random_game $(BINDIR)/one_ply $(BINDIR)/full_player $(BINDIR)/book_gen
+host: $(BINDIR)/perft $(BINDIR)/random_game $(BINDIR)/one_ply $(BINDIR)/full_player $(BINDIR)/uci $(BINDIR)/book_gen
 gb:   $(BINDIR)/perft.gb $(BINDIR)/random_game.gb $(BINDIR)/one_ply.gb $(BINDIR)/full_player.gb
 
 book_data.c:	$(BINDIR)/book_gen book.txt
@@ -88,6 +93,10 @@ $(BINDIR)/one_ply: $(ONEPLY_OBJ_HOST)
 	$(CC) $(CFLAGS_HOST) -o $@ $^
 
 $(BINDIR)/full_player: $(FULL_OBJ_HOST)
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS_HOST) -o $@ $^
+
+$(BINDIR)/uci: $(UCI_OBJ_HOST)
 	@mkdir -p $(@D)
 	$(CC) $(CFLAGS_HOST) -o $@ $^
 
