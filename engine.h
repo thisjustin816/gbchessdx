@@ -23,6 +23,9 @@ void init_game_history(void);
 // Call this after doing a move
 void record_history(void);
 
+// Check if a specific user move is valid
+uint8_t is_user_move_legal(uint8_t from, uint8_t to, Move * move_out);
+
 // Ply of game we are on
 extern uint8_t game_ply;
 

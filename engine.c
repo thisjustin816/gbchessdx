@@ -311,3 +311,25 @@ Move search_best_move(uint8_t max_depth) {
 
     return bestMove;
 }
+
+// Check if a specific user move is valid
+// Returns 1 if legal, 0 if illegal
+// If legal, fills the 'move_out' structure with the correct flags (captures, etc)
+uint8_t is_user_move_legal(uint8_t from, uint8_t to, Move *move_out) {
+    Move moves[MAX_MOVES];
+    uint8_t count = generate_moves(moves);
+
+    for (uint8_t i = 0; i < count; i++) {
+        Move *m = &moves[i];
+        if (m->from == from && m->to == to) {
+            uint8_t illegal = make_move(m);
+            unmake_move(m);
+            if (illegal) {
+                continue;
+            }
+            *move_out = *m;     // Copy data (capture flags, promotion, etc)
+            return 1;
+        }
+    }
+    return 0;
+}
