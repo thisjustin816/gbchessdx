@@ -66,7 +66,7 @@ BOOK_GEN_COMMON_SRC = chess.c eval.c
 BOOK_GEN_OBJ_HOST   = $(addprefix $(OBJDIR_HOST)/, $(BOOK_GEN_COMMON_SRC:.c=.o) $(BOOK_GEN_SRC:.c=.o))
 
 # Full Game
-GBCHESS_SRC     = gbchess.c tiles.c
+GBCHESS_SRC     = gbchess.c tiles.c sound.c
 GBCHESS_OBJ_GB  = $(addprefix $(OBJDIR_GB)/,   $(COMMON_SRC:.c=.o) $(GBCHESS_SRC:.c=.o))
 
 # Main Rules

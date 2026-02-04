@@ -16,6 +16,7 @@
 #include "eval.h"
 #include "engine.h"
 #include "book.h"
+#include "sound.h"
 
 // Tiles
 #define tile_SPACE tiles_map[0xFF]
@@ -208,6 +209,7 @@ uint8_t handle_input(void) {
                 // Optional: Play a "Select" sound here
                 // TODO: Change cursor sprite to "Holding" state?
                 print_xy(19, 17, "S");
+                play_select_sound();
             }
         }
         // CASE B: Piece already selected. Try to move it to 'sq'.
@@ -223,6 +225,7 @@ uint8_t handle_input(void) {
                     // Make the move on the internal board
                     make_move(&m);
                     record_history();
+                    play_select_sound();
 
                     // Redraw the screen
                     draw_board();
@@ -240,8 +243,10 @@ uint8_t handle_input(void) {
                     if (piece != EMPTY && GET_COLOR(piece) == sideToMove) {
                         selected_sq = sq;
                         print_xy(19, 17, "S");
+                        play_select_sound();
                     } else {
                         print_xy(19, 17, "X");
+                        play_error_sound();
                     }
                 }
             }
@@ -296,6 +301,7 @@ int main(void) {
     print_xy(3, 0, "Game Boy Chess");
     draw_board();
     update_cursor_sprite();
+    init_sound();
 
     while (true) {
         if (handle_input()) {
