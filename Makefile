@@ -5,6 +5,7 @@
 # GBDK Paths
 GBDK_ROOT = /opt/gbdk
 LCC       = $(GBDK_ROOT)/bin/lcc
+PNG2ASSET = $(GBDK_ROOT)/bin/png2asset
 
 # Host Compiler
 CC        = gcc
@@ -64,15 +65,24 @@ BOOK_GEN_SRC       = book_gen.c
 BOOK_GEN_COMMON_SRC = chess.c eval.c
 BOOK_GEN_OBJ_HOST   = $(addprefix $(OBJDIR_HOST)/, $(BOOK_GEN_COMMON_SRC:.c=.o) $(BOOK_GEN_SRC:.c=.o))
 
+# Full Game
+GBCHESS_SRC     = gbchess.c tiles.c
+GBCHESS_OBJ_GB  = $(addprefix $(OBJDIR_GB)/,   $(COMMON_SRC:.c=.o) $(GBCHESS_SRC:.c=.o))
+
 # Main Rules
 all: host gb
 
 # Group targets
 host: $(BINDIR)/perft $(BINDIR)/random_game $(BINDIR)/one_ply $(BINDIR)/full_player $(BINDIR)/uci $(BINDIR)/book_gen
-gb:   $(BINDIR)/perft.gb $(BINDIR)/random_game.gb $(BINDIR)/one_ply.gb $(BINDIR)/full_player.gb
+gb:   $(BINDIR)/perft.gb $(BINDIR)/random_game.gb $(BINDIR)/one_ply.gb $(BINDIR)/full_player.gb $(BINDIR)/gbchess.gb
 
 book_data.c:	$(BINDIR)/book_gen book.txt
 	$(BINDIR)/book_gen book.txt > book_data.c
+
+# Rule to convert PNG to C source using png2asset
+# This creates tiles.c and tiles.h
+tiles.h tiles.c: tiles.png
+	$(PNG2ASSET) tiles.png -c tiles.c -map -noflip
 
 # ==========================================
 # Linking Rules
@@ -119,6 +129,10 @@ $(BINDIR)/one_ply.gb: $(ONEPLY_OBJ_GB)
 	$(LCC) $(CFLAGS_GB) -o $@ $^
 
 $(BINDIR)/full_player.gb: $(FULL_OBJ_GB)
+	@mkdir -p $(@D)
+	$(LCC) $(CFLAGS_GB) -o $@ $^
+
+$(BINDIR)/gbchess.gb: $(GBCHESS_OBJ_GB)
 	@mkdir -p $(@D)
 	$(LCC) $(CFLAGS_GB) -o $@ $^
 
