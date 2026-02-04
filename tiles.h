@@ -13,7 +13,7 @@
 #define tiles_TILE_H 8
 #define tiles_WIDTH 128
 #define tiles_HEIGHT 128
-#define tiles_TILE_COUNT 150
+#define tiles_TILE_COUNT 154
 #define tiles_PALETTE_COUNT 1
 #define tiles_COLORS_PER_PALETTE 4
 #define tiles_TOTAL_COLORS 4
@@ -23,6 +23,6 @@ extern const unsigned char tiles_map[256];
 
 BANKREF_EXTERN(tiles)
 extern const palette_color_t tiles_palettes[4];
-extern const uint8_t tiles_tiles[2400];
+extern const uint8_t tiles_tiles[2464];
 
 #endif
