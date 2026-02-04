@@ -151,5 +151,6 @@ const BookEntry opening_book[] = {
     { 0xFDB4, 0x76, 0x55 },
     { 0xFE41, 0x76, 0x55 },
 };
+
 const uint16_t book_len = 146;
 const uint8_t book_max_ply = 10;

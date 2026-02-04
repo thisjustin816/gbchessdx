@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
         printf("    { 0x%04X, 0x%02X, 0x%02X },\n", entries[i].hash, entries[i].from, entries[i].to);
     }
 
-    printf("};\n");
+    printf("};\n\n");
     printf("const uint16_t book_len = %d;\n", entry_count);
     printf("const uint8_t book_max_ply = %d;\n", global_max_ply);
 
