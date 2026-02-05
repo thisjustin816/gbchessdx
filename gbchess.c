@@ -67,6 +67,7 @@ uint8_t selected_sq = NO_SQ;
 uint8_t cursor_x = 3;
 uint8_t cursor_y = 1;           // Rank 2 (White Pawn)
 uint8_t prev_keys = 0;
+Move next_move;
 
 void print_xy(uint8_t x, uint8_t y, const char *s) {
     for (char c = *s++; c; c = *s++) {
@@ -153,7 +154,7 @@ void draw_board(void) {
 }
 
 // Cursor shape varies with selected square
-void set_cursor() {
+void set_cursor(void) {
     uint8_t tile = selected_sq == NO_SQ ? tile_CURSOR_0 : tile_CURSOR_SELECTED_0;
     set_sprite_tile(sprite_CURSOR_0, tile);
     set_sprite_tile(sprite_CURSOR_1, tile + 1);
@@ -198,9 +199,9 @@ void set_selected(uint8_t i) {
 }
 
 // Handles making a move
-// Returns 1 if a move was made
-uint8_t handle_input(void) {
-    uint8_t moved = 0;
+// Returns the move to make or NULL
+Move *handle_input(void) {
+    Move *move_to_make = NULL;
     uint8_t keys = joypad();
 
     // "Just Pressed" logic
@@ -243,21 +244,13 @@ uint8_t handle_input(void) {
                 set_selected(NO_SQ);
             } else {
                 // Check Legality
-                Move m;
-                if (is_user_move_legal(selected_sq, sq, &m)) {
-                    // Make the move on the internal board
-                    make_move(&m);
-                    record_history();
-                    play_select_sound();
-
-                    // Redraw the screen
-                    draw_board();
-
+                if (is_user_move_legal(selected_sq, sq, &next_move)) {
                     // Reset Selection
                     set_selected(NO_SQ);
+                    play_select_sound();
 
-                    // Trigger Computer Response
-                    moved = 1;
+                    // Return the move
+                    move_to_make = &next_move;
                 } else {
                     // Illegal move? 
                     // Option 1: Error buzz sound
@@ -278,7 +271,7 @@ uint8_t handle_input(void) {
         set_selected(NO_SQ);
     }
 
-    return moved;
+    return move_to_make;
 }
 
 // Seed random number generator
@@ -286,6 +279,29 @@ void seed_rand(void) {
     uint16_t seed = DIV_REG;
     seed |= (uint16_t) LY_REG << 8;
     initrand(seed);
+}
+
+// Do the computer move
+Move *computer_move(void) {
+    // Draw a "Thinking..." icon
+    print_xy(0, 17, "Thinking");
+
+    uint8_t found_book = get_book_move(&next_move);
+
+    if (found_book) {
+        // We need to ensure 'captured' and 'special' are correct
+        // because our simple book function didn't fully set them (lazy).
+        next_move.captured = board[next_move.to];
+        next_move.special = 0;  // Book moves are rarely En Passant/Castle (unless deep in book)
+    } else {
+        // Standard Search
+        next_move = search_best_move(3);
+    }
+
+    // Clear "Thinking..." icon
+    print_xy(0, 17, "        ");
+
+    return &next_move;
 }
 
 // Run the game
@@ -311,29 +327,27 @@ int main(void) {
     update_cursor_sprite();
     init_sound();
 
+    uint8_t human_to_move = true;
+
     while (true) {
-        if (handle_input()) {
-            // If handle_input returned 1, the Human just finished their turn.
-            // Now it is the Computer's turn.
+        Move *m;
+        if (human_to_move) {
+            m = handle_input();
+        } else {
+            m = computer_move();
+        }
+        if (m) {
+            make_move(m);
+            record_history();
+            draw_board();
 
-            // Optional: Draw a "Thinking..." icon
-            print_xy(0, 17, "Thinking");
-
-            Move best;
-            uint8_t found_book = get_book_move(&best);
-
-            if (found_book) {
-                // We need to ensure 'captured' and 'special' are correct
-                // because our simple book function didn't fully set them (lazy).
-                best.captured = board[best.to];
-                best.special = 0;       // Book moves are rarely En Passant/Castle (unless deep in book)
+            if (is_check()) {
+                print_xy(0, 17, "Check");
             } else {
-                // Standard Search
-                best = search_best_move(3);
+                print_xy(0, 17, "     ");
             }
 
-            // FIXME
-            if (best.special == 255) {
+            if (game_over()) {
                 if (checkmate_or_stalemate()) {
                     print_xy(0, 17, "Checkmate for ");
                     if (sideToMove == WHITE) {
@@ -344,17 +358,11 @@ int main(void) {
                 } else {
                     print_xy(0, 17, "Stalemate: Draw");
                 }
+                // FIXME wait for keypress
                 return 0;
             }
 
-            make_move(&best);
-            record_history();
-
-            // Refresh
-            draw_board();
-
-            // Clear "Thinking..." icon
-            print_xy(0, 17, "        ");
+            human_to_move = !human_to_move;
         }
         wait_vbl_done();
     }
