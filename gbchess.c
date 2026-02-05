@@ -67,6 +67,7 @@ uint8_t cursor_x = 3;
 uint8_t cursor_y = 1;           // Rank 2 (White Pawn)
 uint8_t prev_keys = 0;
 Move next_move;
+uint8_t level = 2;
 
 void print_xy(uint8_t x, uint8_t y, const char *s) {
     for (char c = *s++; c; c = *s++) {
@@ -392,6 +393,29 @@ void seed_rand(void) {
     initrand(seed);
 }
 
+// Get a random move to next_move
+void get_random_move(void) {
+    Move moveList[MAX_MOVES];
+    uint8_t all_moves_count = generate_moves(moveList);
+
+    // Store indices of legal moves
+    uint8_t legal_indices[MAX_MOVES];
+    uint8_t legal_count = 0;
+
+    // Filter moves: Try each one to see if it's legal
+    for (uint8_t i = 0; i < all_moves_count; i++) {
+        if (make_move(&moveList[i]) == 0) {
+            legal_indices[legal_count++] = i;
+        }
+        unmake_move(&moveList[i]);
+    }
+
+    // Pick a Random Legal Move
+    // rand() % N returns 0 to N-1
+    int rand_index = rand() % legal_count;
+    next_move = moveList[legal_indices[rand_index]];
+}
+
 // Do the computer move
 Move *computer_move(void) {
     // Draw a "Thinking..." icon
@@ -399,14 +423,23 @@ Move *computer_move(void) {
 
     uint8_t found_book = get_book_move(&next_move);
 
-    if (found_book) {
+    // LEVEL 0: "Beginner" (Depth 1 + 25% chance of randomness)
+    if (level == 0) {
+        // Roll dice (0-3). If 0, pick a RANDOM move.
+        if ((rand() & 3) == 0) {
+            get_random_move();
+        } else {
+            // Otherwise, play normal Depth 1
+            next_move = search_best_move(1);
+        }
+    } else if (found_book) {
         // We need to ensure 'captured' and 'special' are correct
         // because our simple book function didn't fully set them (lazy).
         next_move.captured = board[next_move.to];
         next_move.special = 0;  // Book moves are rarely En Passant/Castle (unless deep in book)
     } else {
         // Standard Search
-        next_move = search_best_move(3);
+        next_move = search_best_move(level);
     }
 
     // Clear "Thinking..." icon
@@ -414,6 +447,24 @@ Move *computer_move(void) {
 
     return &next_move;
 }
+
+const char *level_menu_items[] = {
+    "Beginner",
+    "Easy",
+    "Medium",
+    "Hard",
+    NULL
+};
+
+const char *main_menu_items[] = {
+    "Start Game",
+    "Options",
+    "Credits",
+    NULL
+};
+
+uint8_t main_menu_selection = 0;
+
 
 // Run the game
 int main(void) {
@@ -437,6 +488,21 @@ int main(void) {
     draw_board();
     update_cursor_sprite();
     init_sound();
+
+  main_menu:
+    draw_menu(main_menu_items, &main_menu_selection);
+    draw_board();
+    switch (main_menu_selection) {
+    case 0:                    // start game
+        break;
+    case 1:                    // options
+        draw_menu(level_menu_items, &level);
+        draw_board();
+        goto main_menu;
+    case 2:                    // credits
+        goto main_menu;
+    }
+    seed_rand();
 
     uint8_t human_to_move = true;
 
