@@ -35,13 +35,12 @@
 #define tile_CURSOR_SELECTED_0 tiles_map[0x2E]
 #define tile_CURSOR_SELECTED_1 tiles_map[0x3E]
 #define tile_BORDER_TL tiles_map[0xA4]
-#define tile_BORDER_TM tiles_map[0xA5]
+#define tile_BORDER_H tiles_map[0xA5]
 #define tile_BORDER_TR tiles_map[0xA6]
-#define tile_BORDER_ML tiles_map[0xB4]
-#define tile_BORDER_MR tiles_map[0xB6]
+#define tile_BORDER_V tiles_map[0xB4]
 #define tile_BORDER_BL tiles_map[0xC4]
-#define tile_BORDER_BM tiles_map[0xC5]
 #define tile_BORDER_BR tiles_map[0xC6]
+#define tile_CURSOR tiles_map[0xB5]
 
 // Sprites
 
@@ -76,7 +75,7 @@ void print_xy(uint8_t x, uint8_t y, const char *s) {
             tile = c - 'A' + tile_A;
         } else if (c >= 'a' && c <= 'z') {
             tile = c - 'a' + tile_A;
-        } else if (c >= '0' && c <= '0') {
+        } else if (c >= '0' && c <= '9') {
             tile = c - '0' + tile_0;
         }
         set_bkg_tile_xy(x, y, tile);
@@ -88,6 +87,118 @@ void print_xy(uint8_t x, uint8_t y, const char *s) {
                 y = 0;
             }
         }
+    }
+}
+
+// Draw a menu in the center of the screen and let the user choose an
+// item, returning its index.
+//
+// items should be a null terminated array of menu items.
+// current_sel is a pointer to the menu index
+//
+// This will draw a correct sized box in the center of the screen with
+// a border and allow the user to navigate with the d-pad and select
+// with the A button.
+void draw_menu(const char *items[], uint8_t *current_sel) {
+    uint8_t count = 0;
+    uint8_t max_width = 0;
+
+    // Calculate menu dimensions
+    for (const char **ptr = items; *ptr != NULL; ptr++) {
+        uint8_t len = strlen(*ptr);
+        if (len > max_width)
+            max_width = len;
+        count++;
+    }
+
+    // Width = text + cursor space (1) + padding (1)
+    uint8_t menu_w = max_width + 2;
+    uint8_t menu_h = count;
+
+    // Calculate Centered Position
+    // Screen is 20x18 tiles. 
+    // We add 2 to dimensions for the border.
+    uint8_t x_start = (20 - (menu_w + 2)) / 2;
+    uint8_t y_start = (18 - (menu_h + 2)) / 2;
+
+    // Draw the Box
+
+    // Draw Top Border
+    set_bkg_tile_xy(x_start, y_start, tile_BORDER_TL);
+    for (uint8_t i = 0; i < menu_w; i++) {
+        set_bkg_tile_xy(x_start + 1 + i, y_start, tile_BORDER_H);
+    }
+    set_bkg_tile_xy(x_start + menu_w + 1, y_start, tile_BORDER_TR);
+
+    // Draw Middle & Items
+    for (uint8_t i = 0; i < count; i++) {
+        uint8_t row_y = y_start + 1 + i;
+
+        // Left Border
+        set_bkg_tile_xy(x_start, row_y, tile_BORDER_V);
+
+        // Clear background of the row (spaces)
+        for (uint8_t j = 0; j < menu_w; j++) {
+            set_bkg_tile_xy(x_start + 1 + j, row_y, tile_SPACE);
+        }
+
+        // Print the item text (offset by 2: 1 for border, 1 for cursor)
+        print_xy(x_start + 2, row_y, items[i]);
+
+        // Right Border
+        set_bkg_tile_xy(x_start + menu_w + 1, row_y, tile_BORDER_V);
+    }
+
+    // Draw Bottom Border
+    uint8_t y_bot = y_start + menu_h + 1;
+    set_bkg_tile_xy(x_start, y_bot, tile_BORDER_BL);
+    for (uint8_t i = 0; i < menu_w; i++) {
+        set_bkg_tile_xy(x_start + 1 + i, y_bot, tile_BORDER_H);
+    }
+    set_bkg_tile_xy(x_start + menu_w + 1, y_bot, tile_BORDER_BR);
+
+    // Input Loop
+    uint8_t previous_keys = 0;
+    uint8_t redraw_cursor = 1;
+
+    while (1) {
+        // Draw Cursor if needed
+        if (redraw_cursor) {
+            // Erase old cursors
+            for (uint8_t i = 0; i < count; i++) {
+                set_bkg_tile_xy(x_start + 1, y_start + 1 + i, tile_SPACE);
+            }
+            // Draw new cursor
+            set_bkg_tile_xy(x_start + 1, y_start + 1 + *current_sel, tile_CURSOR);
+            redraw_cursor = 0;
+        }
+
+        wait_vbl_done();
+        uint8_t keys = joypad();
+
+        // Handle Input (Debounced)
+        // We check if the key is pressed NOW but wasn't pressed BEFORE
+
+        if ((keys & J_UP) && !(previous_keys & J_UP)) {
+            if (*current_sel > 0) {
+                (*current_sel)--;
+                redraw_cursor = 1;
+            }
+        } else if ((keys & J_DOWN) && !(previous_keys & J_DOWN)) {
+            if (*current_sel < count - 1) {
+                (*current_sel)++;
+                redraw_cursor = 1;
+            }
+        } else if ((keys & J_A) && !(previous_keys & J_A)) {
+            // Blink effect on selection (optional but feels nice)
+            set_bkg_tile_xy(x_start + 1, y_start + 1 + *current_sel, tile_SPACE);
+            delay(100);
+            set_bkg_tile_xy(x_start + 1, y_start + 1 + *current_sel, tile_CURSOR);
+            delay(100);
+            return;
+        }
+
+        previous_keys = keys;
     }
 }
 
