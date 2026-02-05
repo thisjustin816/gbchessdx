@@ -52,3 +52,5 @@ uint8_t make_move(Move * m);
 void unmake_move(Move * m);
 void print_board(void);
 uint8_t checkmate_or_stalemate(void);
+uint8_t game_over(void);
+uint8_t is_check(void);

@@ -538,6 +538,25 @@ void unmake_move(Move *m) {
     epSquare = m->old_ep;
 }
 
+// Game over
+uint8_t game_over(void) {
+    Move moveList[MAX_MOVES];
+
+    uint8_t count = generate_moves(moveList);
+    uint8_t i;
+
+    for (i = 0; i < count; i++) {
+        uint8_t illegal = make_move(&moveList[i]);
+        unmake_move(&moveList[i]);
+        if (!illegal) {
+            return 0;
+        }
+    }
+
+    // No legal moves found so must be Checkmate or Stalemate
+    return 1;
+}
+
 // Returns 1 if it was checkmate, 0 if stalemate.
 // Call only when no legal moves
 uint8_t checkmate_or_stalemate(void) {
@@ -556,6 +575,29 @@ uint8_t checkmate_or_stalemate(void) {
     if (is_square_attacked(myKingSq, OPPONENT(sideToMove))) {
         return 1;
     }
+    return 0;
+}
+
+// Returns 1 if the sideToMove is currently in check, 0 otherwise
+uint8_t is_check(void) {
+    uint8_t myKing = sideToMove | KING;
+    uint8_t myKingSq = 0;
+    uint8_t i;
+
+    // Find the square the King is currently on
+    for (i = 0; i < BOARD_SIZE; i++) {
+        if (!IS_OFFBOARD(i) && board[i] == myKing) {
+            myKingSq = i;
+            break;
+        }
+    }
+
+    // Check if that square is being attacked by the opponent
+    // Note: is_square_attacked expects the color of the ATTACKER
+    if (is_square_attacked(myKingSq, OPPONENT(sideToMove))) {
+        return 1;
+    }
+
     return 0;
 }
 
