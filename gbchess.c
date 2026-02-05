@@ -32,8 +32,8 @@
 #define tilep_BLACK_ON_BLACK_1 0x70
 #define tile_CURSOR_0 tiles_map[0x0E]
 #define tile_CURSOR_1 tiles_map[0x1E]
-#define tile_HIGHLIGHT_0 tiles_map[0x2E]
-#define tile_HIGHLIGHT_1 tiles_map[0x3E]
+#define tile_CURSOR_SELECTED_0 tiles_map[0x2E]
+#define tile_CURSOR_SELECTED_1 tiles_map[0x3E]
 #define tile_BORDER_TL tiles_map[0xA4]
 #define tile_BORDER_TM tiles_map[0xA5]
 #define tile_BORDER_TR tiles_map[0xA6]
@@ -42,6 +42,14 @@
 #define tile_BORDER_BL tiles_map[0xC4]
 #define tile_BORDER_BM tiles_map[0xC5]
 #define tile_BORDER_BR tiles_map[0xC6]
+
+// Sprites
+
+#define sprite_CURSOR_0 0
+#define sprite_CURSOR_1 1
+#define sprite_CURSOR_2 2
+#define sprite_CURSOR_3 3
+#define sprite_EVAL 4
 
 // Screen Position
 #define BOARD_X_START    2
@@ -144,6 +152,20 @@ void draw_board(void) {
     }
 }
 
+// Cursor shape varies with selected square
+void set_cursor() {
+    uint8_t tile = selected_sq == NO_SQ ? tile_CURSOR_0 : tile_CURSOR_SELECTED_0;
+    set_sprite_tile(sprite_CURSOR_0, tile);
+    set_sprite_tile(sprite_CURSOR_1, tile + 1);
+    tile = selected_sq == NO_SQ ? tile_CURSOR_1 : tile_CURSOR_SELECTED_1;
+    set_sprite_tile(sprite_CURSOR_2, tile);
+    set_sprite_tile(sprite_CURSOR_3, tile + 1);
+}
+
+void setup_sprites(void) {
+    set_cursor();
+}
+
 void update_cursor_sprite(void) {
     // Calculate Top-Left Pixel of the 16x16 Square
     uint8_t visual_row = 7 - cursor_y;
@@ -168,6 +190,11 @@ void update_cursor_sprite(void) {
 // Helper: Convert cursor (0-7, 0-7) to 0x88 Index
 uint8_t get_cursor_sq(void) {
     return (cursor_y * 16) + cursor_x;
+}
+
+void set_selected(uint8_t i) {
+    selected_sq = i;
+    set_cursor();
 }
 
 // Handles making a move
@@ -205,10 +232,7 @@ uint8_t handle_input(void) {
         if (selected_sq == NO_SQ) {
             // Check if square has a piece AND it belongs to the side to move
             if (piece != EMPTY && GET_COLOR(piece) == sideToMove) {
-                selected_sq = sq;
-                // Optional: Play a "Select" sound here
-                // TODO: Change cursor sprite to "Holding" state?
-                print_xy(19, 17, "S");
+                set_selected(sq);
                 play_select_sound();
             }
         }
@@ -216,8 +240,7 @@ uint8_t handle_input(void) {
         else {
             // If clicking the SAME square, Deselect (Put it back)
             if (sq == selected_sq) {
-                selected_sq = NO_SQ;
-                print_xy(19, 17, "Y");
+                set_selected(NO_SQ);
             } else {
                 // Check Legality
                 Move m;
@@ -231,8 +254,7 @@ uint8_t handle_input(void) {
                     draw_board();
 
                     // Reset Selection
-                    selected_sq = NO_SQ;
-                    print_xy(19, 17, " ");
+                    set_selected(NO_SQ);
 
                     // Trigger Computer Response
                     moved = 1;
@@ -241,11 +263,9 @@ uint8_t handle_input(void) {
                     // Option 1: Error buzz sound
                     // Option 2: If clicking another friendly piece, switch selection to that piece
                     if (piece != EMPTY && GET_COLOR(piece) == sideToMove) {
-                        selected_sq = sq;
-                        print_xy(19, 17, "S");
+                        set_selected(sq);
                         play_select_sound();
                     } else {
-                        print_xy(19, 17, "X");
                         play_error_sound();
                     }
                 }
@@ -255,22 +275,10 @@ uint8_t handle_input(void) {
 
     // B Button: Always Deselect / Cancel
     if (pressed & J_B) {
-        selected_sq = NO_SQ;
+        set_selected(NO_SQ);
     }
 
     return moved;
-}
-
-void setup_sprites(void) {
-    // Assign Tile IDs to Hardware Sprites 0, 1, 2, 3
-    // Sprite 0 = Top Left (Tile 0 in VRAM)
-    // Sprite 1 = Top Right (Tile 1 in VRAM)
-    // Sprite 2 = Bottom Left (Tile 2 in VRAM)
-    // Sprite 3 = Bottom Right (Tile 3 in VRAM)
-    set_sprite_tile(0, tile_CURSOR_0);
-    set_sprite_tile(1, tile_CURSOR_0 + 1);
-    set_sprite_tile(2, tile_CURSOR_1);
-    set_sprite_tile(3, tile_CURSOR_1 + 1);
 }
 
 // Seed random number generator
