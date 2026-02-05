@@ -203,6 +203,59 @@ void draw_menu(const char *items[], uint8_t *current_sel) {
     }
 }
 
+// A pre-calculated sigmoid-like curve.
+// Maps inputs 0..31 (derived from 0..1024 cp) to output 0..64.
+// This curve is steep at the start (small advantages look big) and flattens out.
+const int8_t EVAL_CURVE[] = {
+    0, 3, 8, 14, 20, 25, 30, 35,        // 0 - 250 cp:   Fast growth
+    39, 43, 46, 49, 51, 53, 55, 56,     // 250 - 500 cp: Slowing down
+    58, 59, 60, 61, 61, 62, 62, 63,     // 500 - 750 cp: Flattening
+    63, 63, 64, 64, 64, 64, 64, 64      // 750+ cp:      Maxed out
+};
+
+// Scale eval fron int16_t in centipawns to +/-64 for plotting
+int8_t scale_eval(int16_t cp) {
+    int8_t is_negative = 0;
+
+    // Safe Absolute Value Logic
+    // We avoid doing math on INT16_MIN (-32768) directly to prevent overflow crashes.
+    if (cp < 0) {
+        if (cp == -32768)
+            return -64;         // Hard clamp for the edge case
+        cp = -cp;               // Safe to negate now
+        is_negative = 1;
+    }
+
+    // Clamp Max Value
+    // 0x0400 is 102If evaluation is > 10.24 pawns, just max out.
+    if (cp >= 0x0400) {
+        return is_negative ? -64 : 64;
+    }
+
+    // Calculate Index (Bit shift right by 5 is divide by 32)
+    // We cast to uint8_t only AFTER shifting to ensure we have a valid small number.
+    uint8_t index = (uint8_t) (cp >> 5);
+
+    // Lookup
+    int8_t val = EVAL_CURVE[index];
+
+    // Return (No multiplication used)
+    if (is_negative) {
+        return -val;
+    } else {
+        return val;
+    }
+}
+
+void update_eval_sprite(void) {
+    int16_t eval = get_final_eval();
+    int8_t scaled_eval = scale_eval(eval);
+    /* int8_t scaled_eval = 0; */
+
+    // Remember this flips if board is flipped!
+    move_sprite(sprite_EVAL, BOARD_PIXEL_X - 8 - 1, BOARD_PIXEL_Y + 64 - 4 - scaled_eval);
+}
+
 // Draw the full board
 void draw_board(void) {
     uint8_t screen_row, col;
@@ -263,6 +316,7 @@ void draw_board(void) {
         set_bkg_tiles(BOARD_X_START, screen_y, 16, 1, line1);
         set_bkg_tiles(BOARD_X_START, screen_y + 1, 16, 1, line2);
     }
+    update_eval_sprite();
 }
 
 // Cursor shape varies with selected square
@@ -277,6 +331,7 @@ void set_cursor(void) {
 
 void setup_sprites(void) {
     set_cursor();
+    set_sprite_tile(sprite_EVAL, tile_CURSOR);
 }
 
 void update_cursor_sprite(void) {
@@ -288,16 +343,16 @@ void update_cursor_sprite(void) {
 
     // Position the 4 Sprites
     // Sprite 0: Top-Left
-    move_sprite(0, x, y);
+    move_sprite(sprite_CURSOR_0, x, y);
 
     // Sprite 1: Top-Right (x + 8)
-    move_sprite(1, x + 8, y);
+    move_sprite(sprite_CURSOR_1, x + 8, y);
 
     // Sprite 2: Bottom-Left (y + 8)
-    move_sprite(2, x, y + 8);
+    move_sprite(sprite_CURSOR_2, x, y + 8);
 
     // Sprite 3: Bottom-Right (x + 8, y + 8)
-    move_sprite(3, x + 8, y + 8);
+    move_sprite(sprite_CURSOR_3, x + 8, y + 8);
 }
 
 // Helper: Convert cursor (0-7, 0-7) to 0x88 Index
