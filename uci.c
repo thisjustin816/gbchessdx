@@ -113,14 +113,8 @@ void uci_loop() {
             }
             log_debug("using depth %d\n", depth);
 
-            // Check Opening Book first
-            Move best;
-            if (!get_book_move(&best)) {
-                best = search_best_move((uint8_t) depth);
-            } else {
-                // Fake a little delay for book moves so we don't crash GUIs
-            }
-            log_debug("Best move found: %d -> %d", best.from, best.to);
+            // Find best move at level
+            Move best = computer_move((uint8_t) depth);
 
             // Output in UCI format (Long Algebraic)
             const char *promotion = (best.special == 3) ? "q" : "";

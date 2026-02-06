@@ -11,6 +11,16 @@
 
 uint32_t nodes;
 
+uint32_t expected[] = {
+    1,
+    20,
+    400,
+    8902,
+    197281,
+    4865609,
+    119060324,
+};
+
 void perft(uint8_t depth) {
     if (depth == 0) {
         nodes++;
@@ -40,7 +50,12 @@ void run_perft_test(uint8_t depth) {
     fflush(stdout);             // Ensure print before computation
 #endif
     perft(depth);
-    printf("Nodes: %" PRIu32 "\n", nodes);
+    printf("Nodes: %" PRIu32, nodes);
+    if (expected[depth] == nodes) {
+        printf(" OK\n");
+    } else {
+        printf(" FAIL want %" PRIu32 "\n", expected[depth]);
+    }
 }
 
 int main(void) {
@@ -48,16 +63,9 @@ int main(void) {
 
     printf("Chess Engine - Validator\n");
 
-    run_perft_test(1);          // 20
-    run_perft_test(2);          // 400
-    run_perft_test(3);          // 8,902
-    run_perft_test(4);          // 197,281
-    run_perft_test(5);          // 4,865,609
-
-    // Depth 6 on PC only (takes too long on GB)
-#ifndef __TARGET_gb
-    run_perft_test(6);          // 119,060,324
-#endif
+    for (uint8_t i = 1; i <= 6; i++) {
+        run_perft_test(i);
+    }
 
 #ifdef __TARGET_gb
     while (1) {

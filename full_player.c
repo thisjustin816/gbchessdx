@@ -39,29 +39,7 @@ void play_full_game(void) {
 #endif
 
     while (ply < 200) {
-        Move best;
-        uint8_t found_book = get_book_move(&best);
-
-        if (found_book) {
-            printf("Book Move!\n");
-            // We need to ensure 'captured' and 'special' are correct
-            // because our simple book function didn't fully set them (lazy).
-            best.captured = board[best.to];
-            best.special = 0;   // Book moves are rarely En Passant/Castle (unless deep in book)
-        } else {
-            // Standard Search
-            best = search_best_move(3);
-        }
-
-        if (best.special == 255) {
-            printf("\n--- GAME OVER ---\n");
-            if (checkmate_or_stalemate()) {
-                printf("CHECKMATE! %s Wins.\n", (sideToMove == WHITE) ? "Black" : "White");
-            } else {
-                printf("STALEMATE! It's a draw.\n");
-            }
-            return;
-        }
+        Move best = computer_move(3);
 
         make_move(&best);
         record_history();
@@ -75,6 +53,21 @@ void play_full_game(void) {
 
         ply++;
 
+        if (game_over()) {
+            if (checkmate_or_stalemate()) {
+                printf("Checkmate for ");
+                if (sideToMove == WHITE) {
+                    printf("Black\n");
+                } else {
+                    printf("White\n");
+                }
+            } else {
+                printf("Stalemate: Draw\n");
+            }
+            return;
+        } else if (is_check()) {
+            printf("Check\n");
+        }
 #ifndef __TARGET_gb
         // system("sleep 1"); 
 #endif

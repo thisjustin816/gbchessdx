@@ -29,4 +29,10 @@ uint8_t is_user_move_legal(uint8_t from, uint8_t to, Move * move_out);
 // Ply of game we are on
 extern uint8_t game_ply;
 
+// Do the computer move using level to control the depth and the random play
+Move computer_move(uint8_t level);
+
+// Get a random move
+Move get_random_move(void);
+
 #endif

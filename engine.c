@@ -2,6 +2,7 @@
 #include "chess.h"
 #include "eval.h"
 #include "engine.h"
+#include "book.h"
 
 #ifdef __TARGET_gb
 #include <rand.h>
@@ -332,4 +333,58 @@ uint8_t is_user_move_legal(uint8_t from, uint8_t to, Move *move_out) {
         }
     }
     return 0;
+}
+
+// Get a random move
+//
+// Don't call unless you've checked there are moves to play first
+Move get_random_move(void) {
+    Move m;
+    Move moveList[MAX_MOVES];
+    uint8_t all_moves_count = generate_moves(moveList);
+
+    // Store indices of legal moves
+    uint8_t legal_indices[MAX_MOVES];
+    uint8_t legal_count = 0;
+
+    // Filter moves: Try each one to see if it's legal
+    for (uint8_t i = 0; i < all_moves_count; i++) {
+        if (make_move(&moveList[i]) == 0) {
+            legal_indices[legal_count++] = i;
+        }
+        unmake_move(&moveList[i]);
+    }
+
+    // Pick a Random Legal Move
+    // rand() % N returns 0 to N-1
+    int rand_index = rand() % legal_count;
+    m = moveList[legal_indices[rand_index]];
+    return m;
+}
+
+// Do the computer move using level to control the depth and the random play
+Move computer_move(uint8_t level) {
+    Move m;
+    uint8_t found_book = get_book_move(&m);
+
+    // LEVEL 0: "Beginner" (Depth 1 + 25% chance of randomness)
+    if (level == 0) {
+        // Roll dice (0-3). If 0, pick a RANDOM move.
+        if ((rand() & 3) == 0) {
+            m = get_random_move();
+        } else {
+            // Otherwise, play normal Depth 1
+            m = search_best_move(1);
+        }
+    } else if (found_book) {
+        // We need to ensure 'captured' and 'special' are correct
+        // because our simple book function didn't fully set them (lazy).
+        m.captured = board[m.to];
+        m.special = 0;          // Book moves are rarely En Passant/Castle (unless deep in book)
+    } else {
+        // Standard Search
+        m = search_best_move(level);
+    }
+
+    return m;
 }
