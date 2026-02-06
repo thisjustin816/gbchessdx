@@ -11,7 +11,7 @@ STOCKFISH_PATH = "stockfish"     # Path to stockfish executable (must be in PATH
 GAMES_TO_PLAY = 1000
 STOCKFISH_ELO = 1320
 STOCKFISH_TIME = 0.1
-DEPTH=3
+DEPTH=1
 
 def play_game(sf_elo):
     # Setup Engines
@@ -72,14 +72,15 @@ def play_game(sf_elo):
 # Main Tournament Loop
 print(f"Starting Match: MyEngine (Depth {DEPTH}) vs Stockfish (ELO {STOCKFISH_ELO})")
 score = 0
-for i in range(GAMES_TO_PLAY):
-    print(f"Playing Game {i+1}...", end=" ", flush=True)
+played = 0
+while played < GAMES_TO_PLAY:
+    print(f"Playing Game {played+1}...", end=" ", flush=True)
     result = play_game(STOCKFISH_ELO)
     if result is None:
         print("Ignored.")
-        score += 0.5
-        continue 
+        continue
+    played += 1
     score += result
-    print(f"Current Score: {score}/{i+1}")
+    print(f"Current Score: {score}/{played}")
 
-print(f"Final Score: {score}/{GAMES_TO_PLAY}")
+print(f"Final Score: {score}/{played}")
