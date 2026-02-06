@@ -367,10 +367,10 @@ Move computer_move(uint8_t level) {
     Move m;
     uint8_t found_book = get_book_move(&m);
 
-    // LEVEL 0: "Beginner" (Depth 1 + 25% chance of randomness)
+    // LEVEL 0: "Beginner" (Depth 1 + chance of randomness)
     if (level == 0) {
-        // Roll dice (0-3). If 0, pick a RANDOM move.
-        if ((rand() & 3) == 0) {
+        // Roll dice
+        if ((rand() % 3) == 0) {
             m = get_random_move();
         } else {
             // Otherwise, play normal Depth 1
