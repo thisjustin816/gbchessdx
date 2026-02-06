@@ -60,6 +60,7 @@ int parse_move_string(char *str, Move *m) {
 
 void uci_loop() {
     char line[64 * 1024];
+    char move[256];
     printf("id name GameBoyChess\n");
     printf("id author Nick Craig-Wood\n");
     printf("uciok\n");
@@ -118,7 +119,9 @@ void uci_loop() {
 
             // Output in UCI format (Long Algebraic)
             const char *promotion = (best.special == 3) ? "q" : "";
-            printf("bestmove %c%d%c%d%s\n", (best.from & 7) + 'a', (best.from >> 4) + 1, (best.to & 7) + 'a', (best.to >> 4) + 1, promotion);
+            sprintf(move, "bestmove %c%d%c%d%s\n", (best.from & 7) + 'a', (best.from >> 4) + 1, (best.to & 7) + 'a', (best.to >> 4) + 1, promotion);
+            printf("%s", move);
+            log_debug(move);
 
             fflush(stdout);
         } else if (strncmp(line, "quit", 4) == 0) {
