@@ -65,7 +65,7 @@ void uci_loop() {
     printf("uciok\n");
 
     while (fgets(line, sizeof(line), stdin)) {
-        int length = strlen(line);
+        size_t length = strlen(line);
         /* if (length < 1) */
         /*     continue; */
         /* if (line[length-1] == '\n') { */
@@ -116,7 +116,7 @@ void uci_loop() {
             // Check Opening Book first
             Move best;
             if (!get_book_move(&best)) {
-                best = search_best_move(depth);
+                best = search_best_move((uint8_t) depth);
             } else {
                 // Fake a little delay for book moves so we don't crash GUIs
             }

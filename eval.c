@@ -165,19 +165,19 @@ void eval_move_piece(uint8_t piece, uint8_t from, uint8_t to) {
 
 // Helper: Manhattan distance (moves to reach square)
 uint8_t distance(uint8_t sq1, uint8_t sq2) {
-    int8_t r1 = sq1 >> 4, c1 = sq1 & 7;
-    int8_t r2 = sq2 >> 4, c2 = sq2 & 7;
-    return abs(r1 - r2) + abs(c1 - c2);
+    int8_t r1 = (int8_t) (sq1 >> 4), c1 = sq1 & 7;
+    int8_t r2 = (int8_t) (sq2 >> 4), c2 = sq2 & 7;
+    return (uint8_t) (abs(r1 - r2) + abs(c1 - c2));
 }
 
 // Helper: Distance from center (for pushing king to edge)
 // Center is 3.5, We scale up to avoid floats.
 uint8_t dist_from_center(uint8_t sq) {
-    int8_t r = sq >> 4, c = sq & 7;
+    int8_t r = (int8_t) (sq >> 4), c = sq & 7;
     // Rank dist: 0->3, 1->2, 2->1, 3->0, 4->0, 5->1 ...
-    int8_t r_dist = abs(r * 2 - 7);
-    int8_t c_dist = abs(c * 2 - 7);
-    return r_dist + c_dist;
+    int8_t r_dist = (int8_t) abs(r * 2 - 7);
+    int8_t c_dist = (int8_t) abs(c * 2 - 7);
+    return (uint8_t) (r_dist + c_dist);
 }
 
 int16_t get_final_eval(void) {
@@ -207,10 +207,10 @@ int16_t get_final_eval(void) {
         uint8_t winningKing = (score > 0) ? wKing : bKing;
 
         // Push losing king to edge (max 14 pts * 10 = 140)
-        mop_up_score += dist_from_center(losingKing) * 10;
+        mop_up_score += (int16_t) (dist_from_center(losingKing) * 10);
 
         // Bring winning king closer (max 14 dist. Bonus = (14 - dist) * 4)
-        mop_up_score += (14 - distance(winningKing, losingKing)) * 4;
+        mop_up_score += (int16_t) ((14 - distance(winningKing, losingKing)) * 4);
 
         // Apply bonus to the winning side
         if (score > 0)

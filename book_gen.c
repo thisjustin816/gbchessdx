@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
     fclose(f);
 
     // Sort entries by Hash (Required for Binary Search on Game Boy)
-    qsort(entries, entry_count, sizeof(BookEntry), compare_entries);
+    qsort(entries, (size_t) entry_count, sizeof(BookEntry), compare_entries);
 
     // Remove Duplicates
     // We filter in-place.
