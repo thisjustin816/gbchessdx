@@ -1,86 +1,108 @@
 import chess
 import chess.engine
 import sys
+import math
+import argparse
 
-#import logging
-#logging.basicConfig(level=logging.DEBUG) 
+# --- ARGUMENT PARSING ---
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Run a chess match between MyEngine and Stockfish.")
+    
+    parser.add_argument("--my-engine", type=str, default="./bin/uci",
+                        help="Path to your compiled C engine")
+    parser.add_argument("--stockfish-path", type=str, default="stockfish",
+                        help="Path to stockfish executable")
+    parser.add_argument("--games", type=int, default=100,
+                        help="Number of games to play")
+    parser.add_argument("--elo", type=int, default=1320,
+                        help="Stockfish ELO rating")
+    parser.add_argument("--time", type=float, default=0.1,
+                        help="Time per move for Stockfish in seconds")
+    parser.add_argument("--depth", type=int, default=3,
+                        help="Fixed depth for your engine")
 
-# CONFIGURATION
-MY_ENGINE_PATH = "./bin/uci"     # Path to your compiled C engine
-STOCKFISH_PATH = "stockfish"     # Path to stockfish executable (must be in PATH or specify full path)
-GAMES_TO_PLAY = 1000
-STOCKFISH_ELO = 1320
-STOCKFISH_TIME = 0.1
-DEPTH=1
+    return parser.parse_args()
+
+# Load arguments
+args = parse_arguments()
+
+# --- HELPER FUNCTIONS ---
+def get_elo_from_score(score_ratio, opponent_elo):
+    epsilon = 1e-9
+    if score_ratio <= epsilon: return "-Inf"
+    if score_ratio >= 1 - epsilon: return "+Inf"
+    diff = -400 * math.log10(1 / score_ratio - 1)
+    return int(opponent_elo + diff)
 
 def play_game(sf_elo):
-    # Setup Engines
-    my_engine = chess.engine.SimpleEngine.popen_uci(MY_ENGINE_PATH)
-    
-    # Stockfish allows setting ELO via UCI options
-    sf_engine = chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH)
+    # Use paths from 'args'
+    my_engine = chess.engine.SimpleEngine.popen_uci(args.my_engine)
+    sf_engine = chess.engine.SimpleEngine.popen_uci(args.stockfish_path)
 
-    # Use Skill Level for very weak play (Level 0 is roughly 800-1000 ELO)
-    # If sf_elo is very low, use Skill Level 0.
     if sf_elo < 1320:
-        # Map roughly: 0=weakest, 20=strongest
-        # Skill Level 0 is often clumsy enough for testing early engines
         sf_engine.configure({"Skill Level": 0}) 
     else:
         sf_engine.configure({"UCI_LimitStrength": True, "UCI_Elo": sf_elo})
 
     board = chess.Board()
     
-    # Game Loop
     while not board.is_game_over():
-        # Whose turn?
         if board.turn == chess.WHITE:
-            # My Engine (White)
-            # We enforce a fixed depth limit for consistency
-            result = my_engine.play(board, chess.engine.Limit(depth=DEPTH))
+            # Use depth from 'args'
+            result = my_engine.play(board, chess.engine.Limit(depth=args.depth))
         else:
-            # Stockfish (Black)
-            # We give Stockfish a time limit
-            result = sf_engine.play(board, chess.engine.Limit(time=STOCKFISH_TIME))
+            # Use time from 'args'
+            result = sf_engine.play(board, chess.engine.Limit(time=args.time))
 
-            # Check for Under-Promotion (Knight, Rook, Bishop)
-            # If Stockfish tries to promote to a knight, abort.
-            # The Game Boy engine will promote to a queen regardless.
-            if result.move.promotion and result.move.promotion == chess.KNIGHT:
-                print(f"Aborting game: Stockfish tried under-promotion to knight ({result.move})")
+            if result.move.promotion and result.move.promotion != chess.QUEEN:
                 my_engine.quit()
                 sf_engine.quit()
-                return None  # Return None to signal "ignore this game"
+                return None
             
         board.push(result.move)
-        
-        # Optional: Print move
-        # print(f"{board.fullmove_number}. {result.move}")
 
-    # Result
     outcome = board.outcome()
-    print(f"Game Over: {outcome.result()} ({outcome.termination.name})")
-    
     my_engine.quit()
     sf_engine.quit()
     
-    # Return 1 if White (MyEngine) won, 0 if Black (SF) won, 0.5 draw
     if outcome.winner == chess.WHITE: return 1.0
     elif outcome.winner == chess.BLACK: return 0.0
     return 0.5
 
-# Main Tournament Loop
-print(f"Starting Match: MyEngine (Depth {DEPTH}) vs Stockfish (ELO {STOCKFISH_ELO})")
-score = 0
-played = 0
-while played < GAMES_TO_PLAY:
-    print(f"Playing Game {played+1}...", end=" ", flush=True)
-    result = play_game(STOCKFISH_ELO)
-    if result is None:
-        print("Ignored.")
-        continue
-    played += 1
-    score += result
-    print(f"Current Score: {score}/{played}")
+# --- MAIN LOOP ---
+print(f"Starting Match: MyEngine (Depth {args.depth}) vs Stockfish (ELO {args.elo})")
+print(f"Settings: {args.games} games, SF Time: {args.time}s")
 
-print(f"Final Score: {score}/{played}")
+results = []
+played = 0
+
+while played < args.games:
+    print(f"Playing Game {played+1}...", end=" ", flush=True)
+    result = play_game(args.elo)
+    
+    if result is None:
+        print("Ignored (Under-promotion error).")
+        continue
+        
+    played += 1
+    results.append(result)
+    
+    # Statistics
+    total_score = sum(results)
+    mean_score = total_score / played
+    variance = sum((r - mean_score) ** 2 for r in results) / played
+    std_dev = math.sqrt(variance)
+    standard_error = std_dev / math.sqrt(played)
+    
+    margin = 1.96 * standard_error
+    lower_bound = mean_score - margin
+    upper_bound = mean_score + margin
+    
+    current_elo = get_elo_from_score(mean_score, args.elo)
+    elo_min = get_elo_from_score(lower_bound, args.elo)
+    elo_max = get_elo_from_score(upper_bound, args.elo)
+    
+    print(f"Score: {total_score}/{played} ({mean_score:.1%}) | "
+          f"Elo: {current_elo} [95% CI: {elo_min} ... {elo_max}]")
+
+print(f"Final Score: {total_score}/{played}")
