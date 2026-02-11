@@ -20,8 +20,8 @@ const int8_t pawn_pst[] = {
     5, -5, -10, 0, 0, -10, -5, 5,
     0, 0, 0, 30, 30, 0, 0, 0,
     5, 5, 10, 25, 25, 10, 5, 5,
-    10, 10, 20, 30, 30, 20, 10, 10,
-    50, 50, 50, 50, 50, 50, 50, 50,
+    20, 20, 30, 40, 40, 30, 20, 20,     // Rank 6: Increased center to 40
+    80, 80, 80, 80, 80, 80, 80, 80,     // Rank 7: Increased from 50 to 80 (Huge incentive)
     0, 0, 0, 0, 0, 0, 0, 0
 };
 
@@ -183,36 +183,57 @@ uint8_t dist_from_center(uint8_t sq) {
 int16_t get_final_eval(void) {
     int16_t score = gameScore;
 
-    // Mop-Up Evaluation
-    // Only apply if one side has a significant winning advantage (> 5 Pawns)
-    if (score > 500 || score < -500) {
-        uint8_t wKing = 0, bKing = 0;
+    // Track kings and material to detect endgame phase
+    uint8_t wKing = 0, bKing = 0;
+    int16_t non_pawn_material = 0;
 
-        // Find Kings (We scan board because we don't track them yet. 
-        // This is okay because we ONLY do it in endgames).
-        for (uint8_t i = 0; i < BOARD_SIZE; i++) {
-            if (IS_OFFBOARD(i))
-                continue;
-            if (board[i] == (WHITE | KING))
-                wKing = i;
-            if (board[i] == (BLACK | KING))
-                bKing = i;
+    // We scan the board to find Kings (already doing this), 
+    // but now we also sum material to detect the "Endgame Phase".
+    for (uint8_t i = 0; i < BOARD_SIZE; i++) {
+        if (IS_OFFBOARD(i))
+            continue;
+
+        uint8_t piece = board[i];
+        if (piece != EMPTY) {
+            uint8_t type = GET_TYPE(piece);
+            if (type == KING) {
+                if (GET_COLOR(piece) == WHITE)
+                    wKing = i;
+                else
+                    bKing = i;
+            } else if (type != PAWN) {
+                // Count Knights, Bishops, Rooks, Queens
+                non_pawn_material += material_value[type];
+            }
         }
+    }
+
+    // ENDGAME TRIGGER:
+    // If we have a massive lead (>500), standard mop-up.
+    // OR: If pieces have been traded off (Material < 1500), enter endgame mode.
+    //    1500 is roughly a Rook + Minor piece per side. 
+    //    This ensures we play K+P vs K correctly.
+    if (score > 500 || score < -500 || non_pawn_material < 1500) {
 
         int16_t mop_up_score = 0;
 
-        // Encourage pushing Losing King to edge
-        // Encourage Winning King to close in
+        // Determine who is attacking
         uint8_t losingKing = (score > 0) ? bKing : wKing;
         uint8_t winningKing = (score > 0) ? wKing : bKing;
 
-        // Push losing king to edge (max 14 pts * 10 = 140)
+        // Push losing king to edge
         mop_up_score += (int16_t) (dist_from_center(losingKing) * 10);
 
-        // Bring winning king closer (max 14 dist. Bonus = (14 - dist) * 4)
+        // Bring winning king closer to enemy king
         mop_up_score += (int16_t) ((14 - distance(winningKing, losingKing)) * 4);
 
-        // Apply bonus to the winning side
+        // KING ACTIVATION (Crucial for Endgames):
+        // The standard King PST encourages hiding in the corner.
+        // In the endgame, we want the King in the center!
+        // We add a bonus for the attacking King being near the center.
+        mop_up_score += (int16_t) ((7 - dist_from_center(winningKing)) * 10);
+
+        // Apply bonus to the side with the advantage
         if (score > 0)
             score += mop_up_score;
         else
