@@ -54,3 +54,5 @@ void print_board(void);
 uint8_t checkmate_or_stalemate(void);
 uint8_t game_over(void);
 uint8_t is_check(void);
+// Returns 1 if the move (from -> to) is valid and legal, 0 otherwise
+uint8_t is_move_valid(uint8_t from, uint8_t to);

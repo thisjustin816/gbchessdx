@@ -50,6 +50,19 @@ uint8_t get_book_move(Move *m) {
     int count = (end - start) + 1;
     int pick = start + (rand() % count);
 
+    // Check move is actually valid as there will be hash collisions
+    for (; count > 0; count--) {
+        if (is_move_valid(opening_book[pick].from, opening_book[pick].to)) {
+            break;
+        }
+        // Chain onto next move
+        if (++pick > end) {
+            pick = start;
+        }
+    }
+    if (count <= 0) {
+        return 0;               // no valid book moves
+    }
     // Output the move
     m->from = opening_book[pick].from;
     m->to = opening_book[pick].to;

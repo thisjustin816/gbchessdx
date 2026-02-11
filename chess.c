@@ -538,6 +538,34 @@ void unmake_move(Move *m) {
     epSquare = m->old_ep;
 }
 
+// Validates if a move from one square to another is legal
+uint8_t is_move_valid(uint8_t from, uint8_t to) {
+    Move moveList[MAX_MOVES];
+    uint8_t count = generate_moves(moveList);
+    uint8_t i;
+
+    // Loop through all pseudo-legal moves
+    for (i = 0; i < count; i++) {
+        if (moveList[i].from == from && moveList[i].to == to) {
+
+            // Found a matching move (Pseudo-legal)
+            // Now attempt to make it to check for King safety
+            uint8_t illegal = make_move(&moveList[i]);
+
+            // Always unmake the move to restore board state
+            unmake_move(&moveList[i]);
+
+            if (!illegal) {
+                return 1;       // Move is valid and legal
+            } else {
+                return 0;       // Move matched but left King in check
+            }
+        }
+    }
+
+    return 0;                   // Move not found in generated list (violates basic rules)
+}
+
 // Game over
 uint8_t game_over(void) {
     Move moveList[MAX_MOVES];
