@@ -367,6 +367,28 @@ Move computer_move(uint8_t level) {
     Move m;
     uint8_t found_book = get_book_move(&m);
 
+    // Count total pieces on the board
+    uint8_t piece_count = 0;
+    for (uint8_t i = 0; i < BOARD_SIZE; i++) {
+        if (!IS_OFFBOARD(i) && board[i] != EMPTY) {
+            piece_count++;
+        }
+    }
+
+    // If we have 10 or fewer pieces, boost depth by 2.
+    // If we have 5 or fewer (e.g. K+P vs K), boost by 4.
+    // We must clamp to MAX_SEARCH_DEPTH to avoid stack overflow.
+    if (level > 0) {            // Don't boost "Beginner" (Level 0)
+        if (piece_count <= 5) {
+            level += 2;
+        } else if (piece_count <= 10) {
+            level += 1;
+        }
+        // Safety Clamp defined in engine.h
+        if (level > MAX_SEARCH_DEPTH) {
+            level = MAX_SEARCH_DEPTH;
+        }
+    }
     // LEVEL 0: "Beginner" (Depth 1 + chance of randomness)
     if (level == 0) {
         // Roll dice
