@@ -35,4 +35,7 @@ Move computer_move(uint8_t level);
 // Get a random move
 Move get_random_move(void);
 
+// Call this after undoing a move
+void undo_history(void);
+
 #endif

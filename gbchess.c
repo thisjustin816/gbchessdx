@@ -67,7 +67,56 @@ uint8_t cursor_x = 3;
 uint8_t cursor_y = 1;           // Rank 2 (White Pawn)
 uint8_t prev_keys = 0;
 Move next_move;
-uint8_t level = 2;
+uint8_t level = 1;
+uint8_t initial_player = 0;
+uint8_t player_to_move = 0;
+uint8_t player_mapping = 2;     // bit 0 player 0, bit 1 player 1, 0 = human, 1 = computer
+uint8_t main_menu_selection = 0;
+uint8_t in_game_menu_selection = 0;
+Move undo_move, undo_prev_move;
+uint8_t undo_valid;
+
+// Menus
+const char *main_menu_items[] = {
+    "Start Game",
+    "Level",
+    "Players",
+    NULL
+};
+
+const char *in_game_menu_items[] = {
+    "Undo",
+    "Swap Sides",
+    "New Game",
+    "Level",
+    "Players",
+    "Exit",
+    NULL
+};
+
+#define in_game_menu_UNDO 0
+#define in_game_menu_SWAP 1
+#define in_game_menu_NEW_GAME 2
+#define in_game_menu_LEVEL 3
+#define in_game_menu_PLAYERS 4
+#define in_game_menu_EXIT 5
+
+const char *level_menu_items[] = {
+    "Beginner  900",
+    "Easy     1050",
+    "Medium   1250",
+    "Hard     1325",
+    NULL
+};
+
+const char *player_menu_items[] = {
+    "Human v Human",
+    "Comp  v Human",
+    "Human v  Comp",
+    "Comp  v  Comp",
+    NULL
+};
+
 
 void print_xy(uint8_t x, uint8_t y, const char *s) {
     for (char c = *s++; c; c = *s++) {
@@ -101,6 +150,8 @@ void print_xy(uint8_t x, uint8_t y, const char *s) {
 // a border and allow the user to navigate with the d-pad and select
 // with the A button.
 void draw_menu(const char *items[], uint8_t *current_sel) {
+    HIDE_SPRITES;
+
     uint8_t count = 0;
     uint8_t max_width = 0;
 
@@ -196,10 +247,24 @@ void draw_menu(const char *items[], uint8_t *current_sel) {
             delay(100);
             set_bkg_tile_xy(x_start + 1, y_start + 1 + *current_sel, tile_CURSOR);
             delay(100);
+            SHOW_SPRITES;
             return;
         }
 
         previous_keys = keys;
+    }
+}
+
+// Wait for any key to be pressed
+void wait_keypress(void) {
+    while (joypad() != 0) {
+        wait_vbl_done();
+    }
+    while (joypad() == 0) {
+        wait_vbl_done();
+    }
+    while (joypad() != 0) {
+        wait_vbl_done();
     }
 }
 
@@ -319,6 +384,27 @@ void draw_board(void) {
     update_eval_sprite();
 }
 
+// Redraw the entire screen
+void redraw(void) {
+    // Clear borders
+    print_xy(2, 0, " Game Boy Chess ");
+    fill_bkg_rect(0, 0, 2, 18, tile_SPACE);
+    fill_bkg_rect(18, 0, 2, 18, tile_SPACE);
+    fill_bkg_rect(2, 17, 16, 1, tile_SPACE);
+
+    draw_board();
+}
+
+// Restart the game
+void new_game(void) {
+    init_board();
+    init_game_history();
+    redraw();
+    player_to_move = initial_player;
+    initial_player = !initial_player;
+    undo_valid = 0;
+}
+
 // Cursor shape varies with selected square
 void set_cursor(void) {
     uint8_t tile = selected_sq == NO_SQ ? tile_CURSOR_0 : tile_CURSOR_SELECTED_0;
@@ -363,6 +449,39 @@ uint8_t get_cursor_sq(void) {
 void set_selected(uint8_t i) {
     selected_sq = i;
     set_cursor();
+}
+
+void in_game_menu(void) {
+    draw_menu(in_game_menu_items, &in_game_menu_selection);
+    redraw();
+    switch (in_game_menu_selection) {
+    case in_game_menu_UNDO:
+        if (undo_valid >= 2) {
+            unmake_move(&undo_move);
+            undo_history();
+            unmake_move(&undo_prev_move);
+            undo_history();
+            undo_valid = 0;
+            redraw();
+        }
+        break;
+    case in_game_menu_SWAP:
+        player_mapping ^= 3;
+        break;
+    case in_game_menu_NEW_GAME:
+        new_game();
+        break;
+    case in_game_menu_LEVEL:
+        draw_menu(level_menu_items, &level);
+        redraw();
+        break;
+    case in_game_menu_PLAYERS:
+        draw_menu(player_menu_items, &player_mapping);
+        redraw();
+        break;
+    case in_game_menu_EXIT:
+        break;
+    }
 }
 
 // Handles making a move
@@ -438,6 +557,12 @@ Move *handle_input(void) {
         set_selected(NO_SQ);
     }
 
+    // Select button: show in game menu
+    if (pressed & J_SELECT) {
+        in_game_menu();
+    }
+
+
     return move_to_make;
 }
 
@@ -448,23 +573,24 @@ void seed_rand(void) {
     initrand(seed);
 }
 
-const char *level_menu_items[] = {
-    "Beginner",
-    "Easy",
-    "Medium",
-    "Hard",
-    NULL
-};
-
-const char *main_menu_items[] = {
-    "Start Game",
-    "Options",
-    "Credits",
-    NULL
-};
-
-uint8_t main_menu_selection = 0;
-
+void main_menu(void) {
+    while (1) {
+        draw_menu(main_menu_items, &main_menu_selection);
+        redraw();
+        switch (main_menu_selection) {
+        case 0:                // start game
+            return;
+        case 1:                // options
+            draw_menu(level_menu_items, &level);
+            redraw();
+            break;
+        case 2:                // player
+            draw_menu(player_menu_items, &player_mapping);
+            redraw();
+            break;
+        }
+    }
+}
 
 // Run the game
 int main(void) {
@@ -473,42 +599,22 @@ int main(void) {
     set_bkg_data(0, tiles_TILE_COUNT, tiles_tiles);
     set_sprite_data(0, tiles_TILE_COUNT, tiles_tiles);
 
-    // Clear screen
-    fill_bkg_rect(0, 0, 20, 18, tile_SPACE);
-
     SHOW_BKG;
     SHOW_SPRITES;
     DISPLAY_ON;
 
     seed_rand();
     setup_sprites();
-    init_board();
-    init_game_history();
-    print_xy(3, 0, "Game Boy Chess");
-    draw_board();
+    new_game();
     update_cursor_sprite();
     init_sound();
 
-  main_menu:
-    draw_menu(main_menu_items, &main_menu_selection);
-    draw_board();
-    switch (main_menu_selection) {
-    case 0:                    // start game
-        break;
-    case 1:                    // options
-        draw_menu(level_menu_items, &level);
-        draw_board();
-        goto main_menu;
-    case 2:                    // credits
-        goto main_menu;
-    }
+    main_menu();
     seed_rand();
-
-    uint8_t human_to_move = true;
 
     while (true) {
         Move *m;
-        if (human_to_move) {
+        if ((player_mapping & (1 << player_to_move)) == 0) {
             m = handle_input();
         } else {
             print_xy(0, 17, "Thinking");
@@ -517,9 +623,15 @@ int main(void) {
             print_xy(0, 17, "        ");
         }
         if (m) {
+            player_to_move = 1 - player_to_move;
             make_move(m);
             record_history();
             draw_board();
+
+            // Record undo moves
+            undo_prev_move = undo_move;
+            undo_move = *m;
+            undo_valid++;
 
             if (is_check()) {
                 print_xy(0, 17, "Check");
@@ -538,11 +650,9 @@ int main(void) {
                 } else {
                     print_xy(0, 17, "Stalemate: Draw");
                 }
-                // FIXME wait for keypress
-                return 0;
+                wait_keypress();
+                new_game();
             }
-
-            human_to_move = !human_to_move;
         }
         wait_vbl_done();
     }

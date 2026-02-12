@@ -32,6 +32,11 @@ void record_history(void) {
     game_ply++;
 }
 
+// Call this after undoing a move
+void undo_history(void) {
+    game_ply--;
+}
+
 uint8_t is_repetition(void) {
     // Scan backwards. If we find the current posHash, it's a repetition.
     // (In real chess it's 3-fold, but for this engine 1 repetition is enough to prune)
