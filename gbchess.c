@@ -34,6 +34,10 @@
 #define tile_CURSOR_1 tiles_map[0x1E]
 #define tile_CURSOR_SELECTED_0 tiles_map[0x2E]
 #define tile_CURSOR_SELECTED_1 tiles_map[0x3E]
+#define tile_MOVE_FROM_0 tiles_map[0x4E]
+#define tile_MOVE_FROM_1 tiles_map[0x5E]
+#define tile_MOVE_TO_0 tiles_map[0x6E]
+#define tile_MOVE_TO_1 tiles_map[0x7E]
 #define tile_BORDER_TL tiles_map[0xA4]
 #define tile_BORDER_H tiles_map[0xA5]
 #define tile_BORDER_TR tiles_map[0xA6]
@@ -49,6 +53,14 @@
 #define sprite_CURSOR_2 2
 #define sprite_CURSOR_3 3
 #define sprite_EVAL 4
+#define sprite_FROM_0 5
+#define sprite_FROM_1 6
+#define sprite_FROM_2 7
+#define sprite_FROM_3 8
+#define sprite_TO_0 9
+#define sprite_TO_1 10
+#define sprite_TO_2 11
+#define sprite_TO_3 12
 
 // Screen Position
 #define BOARD_X_START    2
@@ -395,16 +407,6 @@ void redraw(void) {
     draw_board();
 }
 
-// Restart the game
-void new_game(void) {
-    init_board();
-    init_game_history();
-    redraw();
-    player_to_move = initial_player;
-    initial_player = !initial_player;
-    undo_valid = 0;
-}
-
 // Cursor shape varies with selected square
 void set_cursor(void) {
     uint8_t tile = selected_sq == NO_SQ ? tile_CURSOR_0 : tile_CURSOR_SELECTED_0;
@@ -418,14 +420,22 @@ void set_cursor(void) {
 void setup_sprites(void) {
     set_cursor();
     set_sprite_tile(sprite_EVAL, tile_CURSOR);
+    set_sprite_tile(sprite_FROM_0, tile_MOVE_FROM_0);
+    set_sprite_tile(sprite_FROM_1, tile_MOVE_FROM_0 + 1);
+    set_sprite_tile(sprite_FROM_2, tile_MOVE_FROM_1);
+    set_sprite_tile(sprite_FROM_3, tile_MOVE_FROM_1 + 1);
+    set_sprite_tile(sprite_TO_0, tile_MOVE_TO_0);
+    set_sprite_tile(sprite_TO_1, tile_MOVE_TO_0 + 1);
+    set_sprite_tile(sprite_TO_2, tile_MOVE_TO_1);
+    set_sprite_tile(sprite_TO_3, tile_MOVE_TO_1 + 1);
 }
 
 void update_cursor_sprite(void) {
     // Calculate Top-Left Pixel of the 16x16 Square
     uint8_t visual_row = 7 - cursor_y;
 
-    uint8_t x = BOARD_PIXEL_X + (cursor_x * 16);
-    uint8_t y = BOARD_PIXEL_Y + (visual_row * 16);
+    uint8_t x = BOARD_PIXEL_X + (cursor_x << 4);
+    uint8_t y = BOARD_PIXEL_Y + (visual_row << 4);
 
     // Position the 4 Sprites
     // Sprite 0: Top-Left
@@ -441,6 +451,36 @@ void update_cursor_sprite(void) {
     move_sprite(sprite_CURSOR_3, x + 8, y + 8);
 }
 
+void hide_move_sprites(void) {
+    for (uint8_t i = 0; i < 8; i++) {
+        move_sprite(sprite_FROM_0 + i, 0, 0);
+    }
+}
+
+void move_cursor(uint8_t sprite, uint8_t pos) {
+    uint8_t x = pos & 0x7;
+    uint8_t y = 7 - ((pos >> 4) & 0x7);
+    x = BOARD_PIXEL_X + (x << 4);
+    y = BOARD_PIXEL_Y + (y << 4);
+
+    // Sprite 0: Top-Left
+    move_sprite(sprite + 0, x, y);
+
+    // Sprite 1: Top-Right (x + 8)
+    move_sprite(sprite + 1, x + 8, y);
+
+    // Sprite 2: Bottom-Left (y + 8)
+    move_sprite(sprite + 2, x, y + 8);
+
+    // Sprite 3: Bottom-Right (x + 8, y + 8)
+    move_sprite(sprite + 3, x + 8, y + 8);
+}
+
+void update_move_sprites(Move *m) {
+    move_cursor(sprite_FROM_0, m->from);
+    move_cursor(sprite_TO_0, m->to);
+}
+
 // Helper: Convert cursor (0-7, 0-7) to 0x88 Index
 uint8_t get_cursor_sq(void) {
     return (cursor_y * 16) + cursor_x;
@@ -449,6 +489,17 @@ uint8_t get_cursor_sq(void) {
 void set_selected(uint8_t i) {
     selected_sq = i;
     set_cursor();
+}
+
+// Restart the game
+void new_game(void) {
+    hide_move_sprites();
+    init_board();
+    init_game_history();
+    redraw();
+    player_to_move = initial_player;
+    initial_player = !initial_player;
+    undo_valid = 0;
 }
 
 void in_game_menu(void) {
@@ -462,6 +513,7 @@ void in_game_menu(void) {
             unmake_move(&undo_prev_move);
             undo_history();
             undo_valid = 0;
+            hide_move_sprites();
             redraw();
         }
         break;
@@ -632,6 +684,7 @@ int main(void) {
             undo_prev_move = undo_move;
             undo_move = *m;
             undo_valid++;
+            update_move_sprites(m);
 
             if (is_check()) {
                 print_xy(0, 17, "Check");
