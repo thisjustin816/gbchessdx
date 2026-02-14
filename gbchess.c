@@ -93,6 +93,7 @@ uint16_t message_time = 0;
 uint8_t busy_message = 0;
 uint8_t abort_game = 0;         // signal to abort game in next gameloop
 uint8_t flip = 0;               // 0: white on bottom, 1: black on bottom
+char *current_status = NULL;
 
 // Menus
 const char *main_menu_items[] = {
@@ -170,6 +171,23 @@ void print_xy(uint8_t x, uint8_t y, const char *s) {
                 y = 0;
             }
         }
+    }
+}
+
+// set the current status
+//
+// This is remembered so only pass a static buffer
+void set_status(char *status) {
+    int8_t remaining;
+    current_status = status;
+    if (status) {
+        print_xy(0, 17, status);
+        remaining = 20 - strlen(status);
+    } else {
+        remaining = 20;
+    }
+    if (remaining > 0) {
+        fill_bkg_rect(20 - remaining, 17, remaining, 1, tile_SPACE);
     }
 }
 
@@ -428,6 +446,7 @@ void redraw(void) {
     fill_bkg_rect(0, 0, 2, 18, tile_SPACE);
     fill_bkg_rect(18, 0, 2, 18, tile_SPACE);
     fill_bkg_rect(2, 17, 16, 1, tile_SPACE);
+    set_status(current_status);
 
     draw_board();
 }
@@ -715,13 +734,11 @@ void draw_spinner(void) {
     set_bkg_tile_xy(0, 0, tile_SPINNER_0 + spinner_state);
     if (sys_time - message_time > 50) {
         if (busy_message == 0) {
-            //               01234567890123456789
-            print_xy(0, 17, "Thinking            ");
+            set_status("Thinking");
         } else {
-            //               01234567890123456789
-            print_xy(0, 17, "Hold B to stop      ");
+            set_status("Hold B to stop");
         }
-        busy_message ^= 1;
+        busy_message = !busy_message;
         message_time = sys_time;
     }
     spinner_state = (spinner_state + 1) & 3;
@@ -823,21 +840,20 @@ int main(void) {
             update_move_sprites(m);
 
             if (is_check()) {
-                print_xy(0, 17, "Check");
+                set_status("Check");
             } else {
-                print_xy(0, 17, "     ");
+                set_status(NULL);
             }
 
             if (game_over()) {
                 if (checkmate_or_stalemate()) {
-                    print_xy(0, 17, "Checkmate for ");
                     if (sideToMove == WHITE) {
-                        print_xy(14, 17, "Black");
+                        set_status("Checkmate for Black");
                     } else {
-                        print_xy(14, 17, "White");
+                        set_status("Checkmate for White");
                     }
                 } else {
-                    print_xy(0, 17, "Stalemate: Draw");
+                    set_status("Stalemate Draw");
                 }
                 wait_keypress();
                 new_game();
