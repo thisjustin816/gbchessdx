@@ -91,6 +91,7 @@ uint8_t undo_valid;
 uint8_t spinner_state = 0;
 uint16_t message_time = 0;
 uint8_t busy_message = 0;
+uint8_t abort_game = 0;         // signal to abort game in next gameloop
 
 // Menus
 const char *main_menu_items[] = {
@@ -116,6 +117,17 @@ const char *in_game_menu_items[] = {
 #define in_game_menu_LEVEL 3
 #define in_game_menu_PLAYERS 4
 #define in_game_menu_EXIT 5
+
+const char *interrupt_menu_items[] = {
+    "Continue",
+    "Play Now",
+    "New Game",
+    NULL
+};
+
+#define interrupt_menu_CONTINUE 0
+#define interrupt_menu_PLAY_NOW 1
+#define interrupt_menu_NEW_GAME 2
 
 const char *level_menu_items[] = {
     "Beginner  900",
@@ -680,6 +692,23 @@ void clear_spinner(void) {
     fill_bkg_rect(0, 17, 20, 1, tile_SPACE);
 }
 
+uint8_t interrupt_menu(void) {
+    uint8_t interrupt_menu_selection = 0;
+    draw_menu(interrupt_menu_items, &interrupt_menu_selection);
+    redraw();
+    draw_spinner();
+    switch (interrupt_menu_selection) {
+    case interrupt_menu_CONTINUE:
+        return 0;
+    case interrupt_menu_PLAY_NOW:
+        return 1;
+    case interrupt_menu_NEW_GAME:
+        abort_game = 1;
+        break;
+    }
+    return 0;
+}
+
 uint8_t my_game_callback(void) {
     draw_spinner();
 
@@ -688,7 +717,7 @@ uint8_t my_game_callback(void) {
 
     if (keys & J_B) {
         play_error_sound();
-        return 1;               // Signal engine to abort
+        return interrupt_menu();
     }
 
     return 0;                   // Continue thinking
@@ -727,6 +756,15 @@ int main(void) {
             clear_spinner();
             update_cursor_sprite();
             m = &next_move;
+        }
+        if (abort_game) {
+            abort_game = 0;
+            // Reset the player mapping if abort_game is set when CPU vs CPU
+            if (player_mapping == 3) {
+                player_mapping = 2;
+            }
+            new_game();
+            continue;
         }
         if (m) {
             player_to_move = 1 - player_to_move;
