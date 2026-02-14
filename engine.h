@@ -38,4 +38,7 @@ Move get_random_move(void);
 // Call this after undoing a move
 void undo_history(void);
 
+// Callback function pointer: Returns 1 to force an immediate move, 0 to continue.
+extern uint8_t(*engine_callback) (void);
+
 #endif

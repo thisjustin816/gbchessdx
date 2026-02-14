@@ -18,6 +18,14 @@ Move global_move_stack[STACK_SIZE];
 uint16_t game_history[256];
 uint8_t game_ply = 0;
 
+// Callback for CPU sharing and interrupt
+uint8_t(*engine_callback) (void) = NULL;
+
+// Internal flags for search interruption
+static uint8_t abort_search = 0;
+static uint8_t nodes_visited = 0;
+#define CALLBACK_INTERVAL 0x0F
+
 // Call this before the game loop starts
 void init_game_history(void) {
     game_ply = 0;
@@ -96,6 +104,19 @@ void pick_next_move(uint8_t moveNum, uint8_t count, Move *basePtr) {
 // --- Quiescence Search ---
 // Only searches captures to stabilize the evaluation (avoids horizon effect)
 int16_t quiescence(int16_t alpha, int16_t beta, uint16_t ply_offset) {
+    // Check callback every CALLBACK_INTERVAL nodes
+    nodes_visited++;
+    if ((nodes_visited & CALLBACK_INTERVAL) == 0) {
+        if (engine_callback != NULL) {
+            if (engine_callback()) {
+                abort_search = 1;
+            }
+        }
+    }
+    // If aborted, unwind immediately. Return value doesn't matter (will be discarded).
+    if (abort_search)
+        return 0;
+
     int16_t eval = get_final_eval();
 
     // Stand Pat: If we do nothing, what is the score?
@@ -151,6 +172,19 @@ int16_t quiescence(int16_t alpha, int16_t beta, uint16_t ply_offset) {
 
 // --- Negamax with Alpha-Beta ---
 int16_t negamax(uint8_t depth, int16_t alpha, int16_t beta, uint16_t ply_offset) {
+    // Check callback every CALLBACK_INTERVAL nodes
+    nodes_visited++;
+    if ((nodes_visited & CALLBACK_INTERVAL) == 0) {
+        if (engine_callback != NULL) {
+            if (engine_callback()) {
+                abort_search = 1;
+            }
+        }
+    }
+    // If aborted, unwind immediately. Return value doesn't matter (will be discarded).
+    if (abort_search)
+        return 0;
+
     // Repetition Check
     // If this position has happened before in the game, it's a DRAW (Score 0).
     if (is_repetition()) {
@@ -247,6 +281,10 @@ Move search_best_move(uint8_t max_depth) {
     Move bestMove;
     bestMove.special = 255;     // Sentinel for "no move found yet"
 
+    // Reset Search State
+    abort_search = 0;
+    nodes_visited = 0;
+
     // Generate Root Moves ONCE
     // We will reuse this list for every iteration to save generating time.
     Move *rootMoves = &global_move_stack[0];
@@ -254,6 +292,9 @@ Move search_best_move(uint8_t max_depth) {
 
     if (count == 0)
         return bestMove;        // Game Over check
+
+    // Failsafe: If we abort immediately at Depth 1, have at least ONE legal move ready.
+    bestMove = rootMoves[0];
 
     // Shuffle the root moves so we don't play the same game every time.
     // We only do this once, before Depth 1, so it doesn't break the sorting later.
@@ -294,6 +335,11 @@ Move search_best_move(uint8_t max_depth) {
                 int16_t score = -negamax(current_depth - 1, -beta, -alpha, MAX_PLY_MOVES);
                 unmake_move(m);
 
+                if (abort_search) {
+                    // Stop checking moves immediately
+                    break;
+                }
+
                 if (score > alpha) {
                     alpha = score;
                     bestMoveThisIter = *m;
@@ -306,13 +352,16 @@ Move search_best_move(uint8_t max_depth) {
             }
         }
 
+        if (abort_search) {
+            // Do NOT update 'bestMove' with incomplete results from this depth.
+            // Break the iterative deepening loop and return what we found in the previous depth.
+            break;
+        }
         // Update Global Best
         // Only update if we actually found a legal move this iteration
         if (bestMoveThisIter.special != 255) {
             bestMove = bestMoveThisIter;
         }
-        // TODO: Here you could check a timer. 
-        // If (Time > 5 seconds) break; 
     }
 
     return bestMove;

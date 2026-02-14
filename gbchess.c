@@ -45,6 +45,7 @@
 #define tile_BORDER_BL tiles_map[0xC4]
 #define tile_BORDER_BR tiles_map[0xC6]
 #define tile_CURSOR tiles_map[0xB5]
+#define tile_SPINNER_0 tiles_map[0xB0]
 
 // Sprites
 
@@ -87,6 +88,9 @@ uint8_t main_menu_selection = 0;
 uint8_t in_game_menu_selection = 0;
 Move undo_move, undo_prev_move;
 uint8_t undo_valid;
+uint8_t spinner_state = 0;
+uint16_t message_time = 0;
+uint8_t busy_message = 0;
 
 // Menus
 const char *main_menu_items[] = {
@@ -644,6 +648,46 @@ void main_menu(void) {
     }
 }
 
+void reset_spinner(void) {
+    spinner_state = 0;
+    busy_message = 0;
+}
+
+void draw_spinner(void) {
+    set_bkg_tile_xy(0, 0, tile_SPINNER_0 + spinner_state);
+    if (sys_time - message_time > 50) {
+        if (busy_message == 0) {
+            //               01234567890123456789
+            print_xy(0, 17, "Thinking            ");
+        } else {
+            //               01234567890123456789
+            print_xy(0, 17, "Hold B to stop      ");
+        }
+        busy_message ^= 1;
+        message_time = sys_time;
+    }
+    spinner_state = (spinner_state + 1) & 3;
+}
+
+void clear_spinner(void) {
+    set_bkg_tile_xy(0, 0, tile_SPACE);
+    fill_bkg_rect(0, 17, 20, 1, tile_SPACE);
+}
+
+uint8_t my_game_callback(void) {
+    draw_spinner();
+
+    // If user presses B, interrupt the engine!
+    uint8_t keys = joypad();
+
+    if (keys & J_B) {
+        play_error_sound();
+        return 1;               // Signal engine to abort
+    }
+
+    return 0;                   // Continue thinking
+}
+
 // Run the game
 int main(void) {
     // Load data into Background VRAM and Sprite VRAM
@@ -660,6 +704,7 @@ int main(void) {
     new_game();
     update_cursor_sprite();
     init_sound();
+    engine_callback = my_game_callback;
 
     main_menu();
     seed_rand();
@@ -669,10 +714,11 @@ int main(void) {
         if ((player_mapping & (1 << player_to_move)) == 0) {
             m = handle_input();
         } else {
-            print_xy(0, 17, "Thinking");
+            reset_spinner();
+            draw_spinner();
             next_move = computer_move(level);
+            clear_spinner();
             m = &next_move;
-            print_xy(0, 17, "        ");
         }
         if (m) {
             player_to_move = 1 - player_to_move;
