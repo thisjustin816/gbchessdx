@@ -92,6 +92,7 @@ uint8_t spinner_state = 0;
 uint16_t message_time = 0;
 uint8_t busy_message = 0;
 uint8_t abort_game = 0;         // signal to abort game in next gameloop
+uint8_t flip = 0;               // 0: white on bottom, 1: black on bottom
 
 // Menus
 const char *main_menu_items[] = {
@@ -103,6 +104,7 @@ const char *main_menu_items[] = {
 
 const char *in_game_menu_items[] = {
     "Undo",
+    "Flip Board",
     "Swap Sides",
     "New Game",
     "Level",
@@ -112,22 +114,25 @@ const char *in_game_menu_items[] = {
 };
 
 #define in_game_menu_UNDO 0
-#define in_game_menu_SWAP 1
-#define in_game_menu_NEW_GAME 2
-#define in_game_menu_LEVEL 3
-#define in_game_menu_PLAYERS 4
-#define in_game_menu_EXIT 5
+#define in_game_menu_FLIP 1
+#define in_game_menu_SWAP 2
+#define in_game_menu_NEW_GAME 3
+#define in_game_menu_LEVEL 4
+#define in_game_menu_PLAYERS 5
+#define in_game_menu_EXIT 6
 
 const char *interrupt_menu_items[] = {
     "Continue",
     "Play Now",
+    "Flip Board",
     "New Game",
     NULL
 };
 
 #define interrupt_menu_CONTINUE 0
 #define interrupt_menu_PLAY_NOW 1
-#define interrupt_menu_NEW_GAME 2
+#define interrupt_menu_FLIP 2
+#define interrupt_menu_NEW_GAME 3
 
 const char *level_menu_items[] = {
     "Beginner  900",
@@ -343,19 +348,22 @@ int8_t scale_eval(int16_t cp) {
 void update_eval_sprite(void) {
     int16_t eval = get_final_eval();
     int8_t scaled_eval = scale_eval(eval);
-    /* int8_t scaled_eval = 0; */
 
-    // Remember this flips if board is flipped!
+    if (flip) {
+        scaled_eval = -scaled_eval;
+    }
+
     move_sprite(sprite_EVAL, BOARD_PIXEL_X - 8 - 1, BOARD_PIXEL_Y + 64 - 4 - scaled_eval);
 }
 
 // Draw the full board
 void draw_board(void) {
-    uint8_t screen_row, col;
+    uint8_t board_col, i;
 
     // Iterate 8 rows of the CHESS board
-    for (screen_row = 0; screen_row < 8; screen_row++) {
-        uint8_t board_row = 7 - screen_row;
+    for (i = 0; i < 8; i++) {
+        uint8_t board_row = 7 - i;
+        uint8_t screen_row = flip ? 7 - i : i;
 
         // We will draw 2 screen rows for every 1 chess row
         int screen_y = BOARD_Y_START + (screen_row * 2);
@@ -364,14 +372,15 @@ void draw_board(void) {
         uint8_t line1[16];
         uint8_t line2[16];
 
-        for (col = 0; col < 8; col++) {
-            uint8_t sq_idx = (board_row * 16) + col;
+        for (board_col = 0; board_col < 8; board_col++) {
+            uint8_t screen_col = flip ? 7 - board_col : board_col;
+            uint8_t sq_idx = (board_row * 16) + board_col;
             uint8_t piece = board[sq_idx];
             uint8_t piece_color = GET_COLOR(piece);
 
             // Is this square Light or Dark?
-            // (board_row+col)%2 == 0 is Light, else Dark
-            uint8_t is_dark = ((board_row + col) % 2) == 0;
+            // (board_row+board_col)%2 == 0 is Light, else Dark
+            uint8_t is_dark = ((board_row + board_col) % 2) == 0;
             uint8_t sq_color = (is_dark ? BLACK : WHITE);
 
             uint8_t tl, bl;
@@ -399,10 +408,10 @@ void draw_board(void) {
             bl += offset;
 
             // Fill buffers (2 tiles wide per square)
-            line1[col * 2] = tiles_map[tl];
-            line1[col * 2 + 1] = tiles_map[tl + 1];
-            line2[col * 2] = tiles_map[bl];
-            line2[col * 2 + 1] = tiles_map[bl + 1];
+            line1[screen_col * 2] = tiles_map[tl];
+            line1[screen_col * 2 + 1] = tiles_map[tl + 1];
+            line2[screen_col * 2] = tiles_map[bl];
+            line2[screen_col * 2 + 1] = tiles_map[bl + 1];
         }
 
         // Send to VRAM
@@ -446,42 +455,12 @@ void setup_sprites(void) {
     set_sprite_tile(sprite_TO_3, tile_MOVE_TO_1 + 1);
 }
 
-void update_cursor_sprite(void) {
-    // Calculate Top-Left Pixel of the 16x16 Square
-    uint8_t visual_row = 7 - cursor_y;
-
-    uint8_t x = BOARD_PIXEL_X + (cursor_x << 4);
-    uint8_t y = BOARD_PIXEL_Y + (visual_row << 4);
-
-    // Position the 4 Sprites
-    // Sprite 0: Top-Left
-    move_sprite(sprite_CURSOR_0, x, y);
-
-    // Sprite 1: Top-Right (x + 8)
-    move_sprite(sprite_CURSOR_1, x + 8, y);
-
-    // Sprite 2: Bottom-Left (y + 8)
-    move_sprite(sprite_CURSOR_2, x, y + 8);
-
-    // Sprite 3: Bottom-Right (x + 8, y + 8)
-    move_sprite(sprite_CURSOR_3, x + 8, y + 8);
-}
-
-void hide_cursor(void) {
-    for (uint8_t i = 0; i < 4; i++) {
-        move_sprite(sprite_CURSOR_0 + i, 0, 0);
-    }
-}
-
-void hide_move_sprites(void) {
-    for (uint8_t i = 0; i < 8; i++) {
-        move_sprite(sprite_FROM_0 + i, 0, 0);
-    }
-}
-
-void move_cursor(uint8_t sprite, uint8_t pos) {
-    uint8_t x = pos & 0x7;
-    uint8_t y = 7 - ((pos >> 4) & 0x7);
+// Move sprite to board pos x, y
+void move_cursor(uint8_t sprite, uint8_t x, uint8_t y) {
+    // Translate x,y to visual
+    x = flip ? 7 - x : x;
+    y = flip ? y : 7 - y;
+    // Visual to pixel
     x = BOARD_PIXEL_X + (x << 4);
     y = BOARD_PIXEL_Y + (y << 4);
 
@@ -498,9 +477,36 @@ void move_cursor(uint8_t sprite, uint8_t pos) {
     move_sprite(sprite + 3, x + 8, y + 8);
 }
 
+// Move sprite to board pos pos
+void move_cursor_pos(uint8_t sprite, uint8_t pos) {
+    uint8_t x = pos & 0x7;
+    uint8_t y = (pos >> 4) & 0x7;
+    move_cursor(sprite, x, y);
+}
+
+// Move the cursor sprite to cursor_x, cursor_y
+void update_cursor_sprite(void) {
+    move_cursor(sprite_CURSOR_0, cursor_x, cursor_y);
+}
+
+// Hide the cursor sprite
+void hide_cursor(void) {
+    for (uint8_t i = 0; i < 4; i++) {
+        move_sprite(sprite_CURSOR_0 + i, 0, 0);
+    }
+}
+
+// Hide the move sprites
+void hide_move_sprites(void) {
+    for (uint8_t i = 0; i < 8; i++) {
+        move_sprite(sprite_FROM_0 + i, 0, 0);
+    }
+}
+
+// Update the move sprites to the last move
 void update_move_sprites(Move *m) {
-    move_cursor(sprite_FROM_0, m->from);
-    move_cursor(sprite_TO_0, m->to);
+    move_cursor_pos(sprite_FROM_0, m->from);
+    move_cursor_pos(sprite_TO_0, m->to);
 }
 
 // Helper: Convert cursor (0-7, 0-7) to 0x88 Index
@@ -524,6 +530,24 @@ void new_game(void) {
     undo_valid = 0;
 }
 
+// Flip the board
+void flip_board(void) {
+    flip = !flip;
+    redraw();
+    update_cursor_sprite();
+    if (undo_valid >= 1) {
+        update_move_sprites(&undo_move);
+    } else {
+        hide_move_sprites();
+    }
+}
+
+// Flip the board to match the player if needed
+void flip_board_if_needed(void) {
+    if (player_to_move ^ flip)
+        flip_board();
+}
+
 void in_game_menu(void) {
     draw_menu(in_game_menu_items, &in_game_menu_selection);
     redraw();
@@ -539,8 +563,12 @@ void in_game_menu(void) {
             redraw();
         }
         break;
+    case in_game_menu_FLIP:
+        flip_board();
+        break;
     case in_game_menu_SWAP:
         player_mapping ^= 3;
+        flip_board_if_needed();
         break;
     case in_game_menu_NEW_GAME:
         new_game();
@@ -552,6 +580,7 @@ void in_game_menu(void) {
     case in_game_menu_PLAYERS:
         draw_menu(player_menu_items, &player_mapping);
         redraw();
+        flip_board_if_needed();
         break;
     case in_game_menu_EXIT:
         break;
@@ -570,14 +599,25 @@ Move *handle_input(void) {
     prev_keys = keys;
 
     // D-Pad Movement
-    if (pressed & J_RIGHT && cursor_x < 7)
-        cursor_x++;
-    if (pressed & J_LEFT && cursor_x > 0)
-        cursor_x--;
-    if (pressed & J_UP && cursor_y < 7)
-        cursor_y++;
-    if (pressed & J_DOWN && cursor_y > 0)
-        cursor_y--;
+    if (flip) {
+        if (pressed & J_LEFT && cursor_x < 7)
+            cursor_x++;
+        if (pressed & J_RIGHT && cursor_x > 0)
+            cursor_x--;
+        if (pressed & J_DOWN && cursor_y < 7)
+            cursor_y++;
+        if (pressed & J_UP && cursor_y > 0)
+            cursor_y--;
+    } else {
+        if (pressed & J_RIGHT && cursor_x < 7)
+            cursor_x++;
+        if (pressed & J_LEFT && cursor_x > 0)
+            cursor_x--;
+        if (pressed & J_UP && cursor_y < 7)
+            cursor_y++;
+        if (pressed & J_DOWN && cursor_y > 0)
+            cursor_y--;
+    }
 
     // Update sprite immediately so it feels responsive
     if (pressed & (J_RIGHT | J_LEFT | J_UP | J_DOWN)) {
@@ -699,9 +739,12 @@ uint8_t interrupt_menu(void) {
     draw_spinner();
     switch (interrupt_menu_selection) {
     case interrupt_menu_CONTINUE:
-        return 0;
+        break;
     case interrupt_menu_PLAY_NOW:
         return 1;
+    case interrupt_menu_FLIP:
+        flip_board();
+        break;
     case interrupt_menu_NEW_GAME:
         abort_game = 1;
         break;
@@ -747,6 +790,7 @@ int main(void) {
     while (true) {
         Move *m;
         if ((player_mapping & (1 << player_to_move)) == 0) {
+            flip_board_if_needed();
             m = handle_input();
         } else {
             hide_cursor();
@@ -767,7 +811,7 @@ int main(void) {
             continue;
         }
         if (m) {
-            player_to_move = 1 - player_to_move;
+            player_to_move = !player_to_move;
             make_move(m);
             record_history();
             draw_board();
