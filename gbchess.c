@@ -455,6 +455,12 @@ void update_cursor_sprite(void) {
     move_sprite(sprite_CURSOR_3, x + 8, y + 8);
 }
 
+void hide_cursor(void) {
+    for (uint8_t i = 0; i < 4; i++) {
+        move_sprite(sprite_CURSOR_0 + i, 0, 0);
+    }
+}
+
 void hide_move_sprites(void) {
     for (uint8_t i = 0; i < 8; i++) {
         move_sprite(sprite_FROM_0 + i, 0, 0);
@@ -714,10 +720,12 @@ int main(void) {
         if ((player_mapping & (1 << player_to_move)) == 0) {
             m = handle_input();
         } else {
+            hide_cursor();
             reset_spinner();
             draw_spinner();
             next_move = computer_move(level);
             clear_spinner();
+            update_cursor_sprite();
             m = &next_move;
         }
         if (m) {
