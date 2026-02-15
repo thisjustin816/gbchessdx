@@ -20,8 +20,14 @@
 
 // Tiles
 #define tile_SPACE tiles_map[0xFF]
-#define tile_A tiles_map[0x80]
-#define tile_0 tiles_map[0x9A]
+#define tile_A tiles_map[0xA0]
+#define tile_0 tiles_map[0xBA]
+#define tile_DOT tiles_map[0xC4]
+#define tile_COLON tiles_map[0xC5]
+#define tile_MINUS tiles_map[0xC6]
+#define tile_ELIPSIS tiles_map[0xC7]
+#define tile_SLASH tiles_map[0xC8]
+#define tile_AT tiles_map[0xC9]
 #define tilep_WHITE_ON_WHITE_0 0x00
 #define tilep_WHITE_ON_WHITE_1 0x10
 #define tilep_BLACK_ON_WHITE_0 0x20
@@ -30,6 +36,8 @@
 #define tilep_WHITE_ON_BLACK_1 0x50
 #define tilep_BLACK_ON_BLACK_0 0x60
 #define tilep_BLACK_ON_BLACK_1 0x70
+#define tilep_GHOST_0 0x80
+#define tilep_GHOST_1 0xA0
 #define tile_CURSOR_0 tiles_map[0x0E]
 #define tile_CURSOR_1 tiles_map[0x1E]
 #define tile_CURSOR_SELECTED_0 tiles_map[0x2E]
@@ -38,14 +46,15 @@
 #define tile_MOVE_FROM_1 tiles_map[0x5E]
 #define tile_MOVE_TO_0 tiles_map[0x6E]
 #define tile_MOVE_TO_1 tiles_map[0x7E]
-#define tile_BORDER_TL tiles_map[0xA4]
-#define tile_BORDER_H tiles_map[0xA5]
-#define tile_BORDER_TR tiles_map[0xA6]
-#define tile_BORDER_V tiles_map[0xB4]
-#define tile_BORDER_BL tiles_map[0xC4]
-#define tile_BORDER_BR tiles_map[0xC6]
-#define tile_CURSOR tiles_map[0xB5]
-#define tile_SPINNER_0 tiles_map[0xB0]
+
+#define tile_BORDER_TL tiles_map[0xD4]
+#define tile_BORDER_H tiles_map[0xD5]
+#define tile_BORDER_TR tiles_map[0xD6]
+#define tile_BORDER_V tiles_map[0xD9]
+#define tile_BORDER_BL tiles_map[0xD7]
+#define tile_BORDER_BR tiles_map[0xD8]
+#define tile_CURSOR tiles_map[0xDA]
+#define tile_SPINNER_0 tiles_map[0xD0]
 
 // Sprites
 
@@ -161,6 +170,18 @@ void print_xy(uint8_t x, uint8_t y, const char *s) {
             tile = c - 'a' + tile_A;
         } else if (c >= '0' && c <= '9') {
             tile = c - '0' + tile_0;
+        } else if (c == '.') {
+            tile = tile_DOT;
+        } else if (c == ':') {
+            tile = tile_COLON;
+        } else if (c == '-') {
+            tile = tile_MINUS;
+        } else if (c == '_') {
+            tile = tile_ELIPSIS;
+        } else if (c == '/') {
+            tile = tile_SLASH;
+        } else if (c == '@') {
+            tile = tile_AT;
         }
         set_bkg_tile_xy(x, y, tile);
         x += 1;
@@ -734,7 +755,7 @@ void draw_spinner(void) {
     set_bkg_tile_xy(0, 0, tile_SPINNER_0 + spinner_state);
     if (sys_time - message_time > 50) {
         if (busy_message == 0) {
-            set_status("Thinking");
+            set_status("Thinking_");
         } else {
             set_status("Hold B to stop");
         }
@@ -853,7 +874,7 @@ int main(void) {
                         set_status("Checkmate for White");
                     }
                 } else {
-                    set_status("Stalemate Draw");
+                    set_status("Draw: Stalemate");
                 }
                 wait_keypress();
                 new_game();
