@@ -37,7 +37,7 @@
 #define tilep_BLACK_ON_BLACK_0 0x60
 #define tilep_BLACK_ON_BLACK_1 0x70
 #define tilep_GHOST_0 0x80
-#define tilep_GHOST_1 0xA0
+#define tilep_GHOST_1 0x90
 #define tile_CURSOR_0 tiles_map[0x0E]
 #define tile_CURSOR_1 tiles_map[0x1E]
 #define tile_CURSOR_SELECTED_0 tiles_map[0x2E]
@@ -85,6 +85,7 @@
 // State
 #define NO_SQ 255
 uint8_t selected_sq = NO_SQ;
+uint8_t selected_piece_type = EMPTY;
 uint8_t cursor_x = 3;
 uint8_t cursor_y = 1;           // Rank 2 (White Pawn)
 uint8_t prev_keys = 0;
@@ -475,35 +476,52 @@ void redraw(void) {
 // Cursor shape varies with selected square
 void set_cursor(void) {
     uint8_t tile = selected_sq == NO_SQ ? tile_CURSOR_0 : tile_CURSOR_SELECTED_0;
+    if (selected_piece_type != EMPTY) {
+        tile = tiles_map[tilep_GHOST_0 + (selected_piece_type << 1)];
+    }
     set_sprite_tile(sprite_CURSOR_0, tile);
     set_sprite_tile(sprite_CURSOR_1, tile + 1);
+
     tile = selected_sq == NO_SQ ? tile_CURSOR_1 : tile_CURSOR_SELECTED_1;
+    if (selected_piece_type != EMPTY) {
+        tile = tiles_map[tilep_GHOST_1 + (selected_piece_type << 1)];
+    }
     set_sprite_tile(sprite_CURSOR_2, tile);
     set_sprite_tile(sprite_CURSOR_3, tile + 1);
+}
+
+void set_cursor_sprite(uint8_t sprite, uint8_t tile0, uint8_t tile1) {
+    set_sprite_tile(sprite, tile0);
+    set_sprite_tile(sprite + 1, tile0 + 1);
+    set_sprite_tile(sprite + 2, tile1);
+    set_sprite_tile(sprite + 3, tile1 + 1);
 }
 
 void setup_sprites(void) {
     set_cursor();
     set_sprite_tile(sprite_EVAL, tile_CURSOR);
-    set_sprite_tile(sprite_FROM_0, tile_MOVE_FROM_0);
-    set_sprite_tile(sprite_FROM_1, tile_MOVE_FROM_0 + 1);
-    set_sprite_tile(sprite_FROM_2, tile_MOVE_FROM_1);
-    set_sprite_tile(sprite_FROM_3, tile_MOVE_FROM_1 + 1);
-    set_sprite_tile(sprite_TO_0, tile_MOVE_TO_0);
-    set_sprite_tile(sprite_TO_1, tile_MOVE_TO_0 + 1);
-    set_sprite_tile(sprite_TO_2, tile_MOVE_TO_1);
-    set_sprite_tile(sprite_TO_3, tile_MOVE_TO_1 + 1);
+    set_cursor_sprite(sprite_FROM_0, tile_MOVE_FROM_0, tile_MOVE_FROM_1);
+    set_cursor_sprite(sprite_TO_0, tile_MOVE_TO_0, tile_MOVE_TO_1);
 }
 
-// Move sprite to board pos x, y
-void move_cursor(uint8_t sprite, uint8_t x, uint8_t y) {
+uint8_t board_to_sprite_x(uint8_t x) {
     // Translate x,y to visual
     x = flip ? 7 - x : x;
-    y = flip ? y : 7 - y;
     // Visual to pixel
     x = BOARD_PIXEL_X + (x << 4);
-    y = BOARD_PIXEL_Y + (y << 4);
+    return x;
+}
 
+uint8_t board_to_sprite_y(uint8_t y) {
+    // Translate x,y to visual
+    y = flip ? y : 7 - y;
+    // Visual to pixel
+    y = BOARD_PIXEL_Y + (y << 4);
+    return y;
+}
+
+// Move sprite to pixel pos x, y
+void move_cursor_pixel(uint8_t sprite, uint8_t x, uint8_t y) {
     // Sprite 0: Top-Left
     move_sprite(sprite + 0, x, y);
 
@@ -517,16 +535,53 @@ void move_cursor(uint8_t sprite, uint8_t x, uint8_t y) {
     move_sprite(sprite + 3, x + 8, y + 8);
 }
 
-// Move sprite to board pos pos
-void move_cursor_pos(uint8_t sprite, uint8_t pos) {
-    uint8_t x = pos & 0x7;
-    uint8_t y = (pos >> 4) & 0x7;
-    move_cursor(sprite, x, y);
+// Move sprite to board pos x, y
+void move_cursor(uint8_t sprite, uint8_t x, uint8_t y) {
+    x = board_to_sprite_x(x);
+    y = board_to_sprite_y(y);
+    move_cursor_pixel(sprite, x, y);
+}
+
+// Animate cursor movement from (x0, y0) to (x1, y1) in board
+// co-ordinates
+void animate_cursor_move(uint8_t sprite, uint8_t log2_frames, uint8_t x0, uint8_t y0, uint8_t x1, uint8_t y1) {
+    x0 = board_to_sprite_x(x0);
+    y0 = board_to_sprite_y(y0);
+    x1 = board_to_sprite_x(x1);
+    y1 = board_to_sprite_y(y1);
+
+    // int16_t avoids overflow issues during subtraction
+    int8_t dx = ((int16_t) x1 - (int16_t) x0) >> log2_frames;
+    int8_t dy = ((int16_t) y1 - (int16_t) y0) >> log2_frames;
+
+    for (uint8_t i = 1 << log2_frames; i > 0; i--) {
+        // Sync with VBlank so animation speed is consistent (60fps)
+        wait_vbl_done();
+
+        x0 += dx;
+        y0 += dy;
+
+        move_cursor_pixel(sprite, x0, y0);
+    }
+
+    // Ensure final position is exact
+    move_cursor_pixel(sprite, x1, y1);
 }
 
 // Move the cursor sprite to cursor_x, cursor_y
 void update_cursor_sprite(void) {
     move_cursor(sprite_CURSOR_0, cursor_x, cursor_y);
+}
+
+// Animate the cursor sprite to cursor_x+dx, cursor_y+dy
+void animate_cursor_sprite(int8_t dx, int8_t dy) {
+    if (dx == 0 && dy == 0) {
+        move_cursor(sprite_CURSOR_0, cursor_x, cursor_y);
+    } else {
+        animate_cursor_move(sprite_CURSOR_0, 2, cursor_x, cursor_y, cursor_x + dx, cursor_y + dy);
+        cursor_x += dx;
+        cursor_y += dy;
+    }
 }
 
 // Hide the cursor sprite
@@ -544,9 +599,25 @@ void hide_move_sprites(void) {
 }
 
 // Update the move sprites to the last move
-void update_move_sprites(Move *m) {
-    move_cursor_pos(sprite_FROM_0, m->from);
-    move_cursor_pos(sprite_TO_0, m->to);
+//
+// Assumes move has been made on the board
+void update_move_sprites(Move *m, uint8_t animate) {
+    uint8_t x0 = m->from & 0x7;
+    uint8_t y0 = (m->from >> 4) & 0x7;
+    uint8_t x1 = m->to & 0x7;
+    uint8_t y1 = (m->to >> 4) & 0x7;
+    uint8_t piece_type = GET_TYPE(board[m->to]);
+    uint8_t tile0 = tiles_map[tilep_GHOST_0 + (piece_type << 1)];
+    uint8_t tile1 = tiles_map[tilep_GHOST_1 + (piece_type << 1)];
+    move_cursor(sprite_FROM_0, x0, y0);
+    if (animate) {
+        move_cursor(sprite_TO_0, x0, y0);
+        set_cursor_sprite(sprite_TO_0, tile0, tile1);
+        animate_cursor_move(sprite_TO_0, 4, x0, y0, x1, y1);
+        set_cursor_sprite(sprite_TO_0, tile_MOVE_TO_0, tile_MOVE_TO_1);
+    } else {
+        move_cursor(sprite_TO_0, x1, y1);
+    }
 }
 
 // Helper: Convert cursor (0-7, 0-7) to 0x88 Index
@@ -554,8 +625,9 @@ uint8_t get_cursor_sq(void) {
     return (cursor_y * 16) + cursor_x;
 }
 
-void set_selected(uint8_t i) {
+void set_selected(uint8_t i, uint8_t piece_type) {
     selected_sq = i;
+    selected_piece_type = piece_type;
     set_cursor();
 }
 
@@ -576,7 +648,7 @@ void flip_board(void) {
     redraw();
     update_cursor_sprite();
     if (undo_valid >= 1) {
-        update_move_sprites(&undo_move);
+        update_move_sprites(&undo_move, 0);
     } else {
         hide_move_sprites();
     }
@@ -639,29 +711,30 @@ Move *handle_input(void) {
     prev_keys = keys;
 
     // D-Pad Movement
+    int8_t dx = 0, dy = 0;
     if (flip) {
         if (pressed & J_LEFT && cursor_x < 7)
-            cursor_x++;
+            dx = 1;
         if (pressed & J_RIGHT && cursor_x > 0)
-            cursor_x--;
+            dx = -1;
         if (pressed & J_DOWN && cursor_y < 7)
-            cursor_y++;
+            dy = 1;
         if (pressed & J_UP && cursor_y > 0)
-            cursor_y--;
+            dy = -1;
     } else {
         if (pressed & J_RIGHT && cursor_x < 7)
-            cursor_x++;
+            dx = 1;
         if (pressed & J_LEFT && cursor_x > 0)
-            cursor_x--;
+            dx = -1;
         if (pressed & J_UP && cursor_y < 7)
-            cursor_y++;
+            dy = 1;
         if (pressed & J_DOWN && cursor_y > 0)
-            cursor_y--;
+            dy = -1;
     }
 
     // Update sprite immediately so it feels responsive
     if (pressed & (J_RIGHT | J_LEFT | J_UP | J_DOWN)) {
-        update_cursor_sprite();
+        animate_cursor_sprite(dx, dy);
     }
 
     // Selection Logic (A Button)
@@ -673,7 +746,7 @@ Move *handle_input(void) {
         if (selected_sq == NO_SQ) {
             // Check if square has a piece AND it belongs to the side to move
             if (piece != EMPTY && GET_COLOR(piece) == sideToMove) {
-                set_selected(sq);
+                set_selected(sq, GET_TYPE(piece));
                 play_select_sound();
             }
         }
@@ -681,12 +754,12 @@ Move *handle_input(void) {
         else {
             // If clicking the SAME square, Deselect (Put it back)
             if (sq == selected_sq) {
-                set_selected(NO_SQ);
+                set_selected(NO_SQ, EMPTY);
             } else {
                 // Check Legality
                 if (is_user_move_legal(selected_sq, sq, &next_move)) {
                     // Reset Selection
-                    set_selected(NO_SQ);
+                    set_selected(NO_SQ, EMPTY);
                     play_select_sound();
 
                     // Return the move
@@ -696,7 +769,7 @@ Move *handle_input(void) {
                     // Option 1: Error buzz sound
                     // Option 2: If clicking another friendly piece, switch selection to that piece
                     if (piece != EMPTY && GET_COLOR(piece) == sideToMove) {
-                        set_selected(sq);
+                        set_selected(sq, GET_TYPE(piece));
                         play_select_sound();
                     } else {
                         play_error_sound();
@@ -708,7 +781,7 @@ Move *handle_input(void) {
 
     // B Button: Always Deselect / Cancel
     if (pressed & J_B) {
-        set_selected(NO_SQ);
+        set_selected(NO_SQ, EMPTY);
     }
 
     // Select button: show in game menu
@@ -852,13 +925,14 @@ int main(void) {
             player_to_move = !player_to_move;
             make_move(m);
             record_history();
-            draw_board();
 
             // Record undo moves
             undo_prev_move = undo_move;
             undo_move = *m;
             undo_valid++;
-            update_move_sprites(m);
+            update_move_sprites(m, 1);
+
+            draw_board();
 
             if (is_check()) {
                 set_status("Check");
