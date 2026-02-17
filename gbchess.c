@@ -425,14 +425,19 @@ void draw_board(void) {
 
         for (board_col = 0; board_col < 8; board_col++) {
             uint8_t screen_col = flip ? 7 - board_col : board_col;
-            uint8_t sq_idx = (board_row * 16) + board_col;
+            uint8_t sq_idx = (board_row << 4) + board_col;
             uint8_t piece = board[sq_idx];
             uint8_t piece_color = GET_COLOR(piece);
 
             // Is this square Light or Dark?
-            // (board_row+board_col)%2 == 0 is Light, else Dark
-            uint8_t is_dark = ((board_row + board_col) % 2) == 0;
-            uint8_t sq_color = (is_dark ? BLACK : WHITE);
+            uint8_t is_dark = ((board_row + board_col) & 0x01) ^ 0x01;
+
+            // Create a mask: 0xFF if dark, 0x00 if light
+            uint8_t mask = -(int8_t) is_dark;
+
+            // Apply the mask to the color difference
+            // This results in BLACK if is_dark is 1, and WHITE if is_dark is 0
+            uint8_t sq_color = (BLACK & mask) | (WHITE & ~mask);
 
             uint8_t tl, bl;
 

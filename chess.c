@@ -442,7 +442,7 @@ uint8_t make_move(Move *m) {
     if (type == PAWN) {
         int diff = (int) to - (int) from;
         if (diff == 32 || diff == -32)
-            epSquare = (uint8_t) ((from + to) / 2);
+            epSquare = (uint8_t) (((uint16_t) from + (uint16_t) to) >> 1);
     }
     // Flip Side Hash
     posHash ^= 0xFFFF;
