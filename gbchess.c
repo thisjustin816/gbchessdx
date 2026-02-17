@@ -28,6 +28,7 @@
 #define tile_ELIPSIS tiles_map[0xC7]
 #define tile_SLASH tiles_map[0xC8]
 #define tile_AT tiles_map[0xC9]
+#define tile_PLING tiles_map[0xCA]
 #define tilep_WHITE_ON_WHITE_0 0x00
 #define tilep_WHITE_ON_WHITE_1 0x10
 #define tilep_BLACK_ON_WHITE_0 0x20
@@ -110,8 +111,14 @@ const char *main_menu_items[] = {
     "Start Game",
     "Level",
     "Players",
+    "Help",
     NULL
 };
+
+#define main_menu_START 0
+#define main_menu_LEVEL 1
+#define main_menu_PLAYERS 2
+#define main_menu_HELP 3
 
 const char *in_game_menu_items[] = {
     "Undo",
@@ -120,6 +127,7 @@ const char *in_game_menu_items[] = {
     "New Game",
     "Level",
     "Players",
+    "Help",
     "Exit",
     NULL
 };
@@ -130,7 +138,8 @@ const char *in_game_menu_items[] = {
 #define in_game_menu_NEW_GAME 3
 #define in_game_menu_LEVEL 4
 #define in_game_menu_PLAYERS 5
-#define in_game_menu_EXIT 6
+#define in_game_menu_HELP 6
+#define in_game_menu_EXIT 7
 
 const char *interrupt_menu_items[] = {
     "Continue",
@@ -183,6 +192,8 @@ void print_xy(uint8_t x, uint8_t y, const char *s) {
             tile = tile_SLASH;
         } else if (c == '@') {
             tile = tile_AT;
+        } else if (c == '!') {
+            tile = tile_PLING;
         }
         set_bkg_tile_xy(x, y, tile);
         x += 1;
@@ -660,6 +671,48 @@ void flip_board_if_needed(void) {
         flip_board();
 }
 
+// Show the help screen
+void show_help(void) {
+    HIDE_SPRITES;
+
+    // Draw the Outer Border (20x18)
+    set_bkg_tile_xy(0, 0, tile_BORDER_TL);
+    set_bkg_tile_xy(19, 0, tile_BORDER_TR);
+    set_bkg_tile_xy(0, 17, tile_BORDER_BL);
+    set_bkg_tile_xy(19, 17, tile_BORDER_BR);
+
+    fill_bkg_rect(1, 0, 18, 1, tile_BORDER_H);
+    fill_bkg_rect(1, 17, 18, 1, tile_BORDER_H);
+
+    fill_bkg_rect(0, 1, 1, 16, tile_BORDER_V);
+    fill_bkg_rect(19, 1, 1, 16, tile_BORDER_V);
+
+    // Clear interior
+    fill_bkg_rect(1, 1, 18, 16, tile_SPACE);
+
+    // Print the text content
+    // X and Y offsets are chosen to center the 18x16 content area
+    print_xy(4, 2, "- CONTROLS -");
+    print_xy(2, 4, "DPAD : MOVE");
+    print_xy(2, 5, "A    : PICK/PLACE");
+    print_xy(2, 6, "B    : CANCEL");
+    print_xy(2, 7, "SEL  : MENU");
+
+    print_xy(5, 9, "- ENGINE -");
+    print_xy(2, 11, "HOLD B: STOP CPU");
+
+    print_xy(6, 13, "- GOAL -");
+    print_xy(3, 15, "CHECKMATE THE");
+    print_xy(2, 16, "OPPONENTS KING!");
+
+    // Wait for user to acknowledge
+    wait_keypress();
+
+    // Cleanup
+    SHOW_SPRITES;
+    redraw();                   // Restore the board and status bar
+}
+
 void in_game_menu(void) {
     draw_menu(in_game_menu_items, &in_game_menu_selection);
     redraw();
@@ -693,6 +746,9 @@ void in_game_menu(void) {
         draw_menu(player_menu_items, &player_mapping);
         redraw();
         flip_board_if_needed();
+        break;
+    case in_game_menu_HELP:
+        show_help();
         break;
     case in_game_menu_EXIT:
         break;
@@ -805,15 +861,18 @@ void main_menu(void) {
         draw_menu(main_menu_items, &main_menu_selection);
         redraw();
         switch (main_menu_selection) {
-        case 0:                // start game
+        case main_menu_START:
             return;
-        case 1:                // options
+        case main_menu_LEVEL:
             draw_menu(level_menu_items, &level);
             redraw();
             break;
-        case 2:                // player
+        case main_menu_PLAYERS:
             draw_menu(player_menu_items, &player_mapping);
             redraw();
+            break;
+        case main_menu_HELP:
+            show_help();
             break;
         }
     }
