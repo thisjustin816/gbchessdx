@@ -1,0 +1,82 @@
+--- chess.c
++++ chess.c
+@@ -125,6 +125,21 @@
+ 
+ // --- Move Generation & Execution ---
+ 
++/* EXPERIMENTAL: four FIDE promotion choices, encoded as special=3..6. */
++static uint8_t append_promotion_options(Move *moves, uint8_t index) {
++    Move original = moves[index];
++    uint8_t count = (uint8_t)(index + 1);
++    if (original.special == 3) {
++        for (uint8_t promotion = 4; promotion <= 6; promotion++) {
++            if (count == MAX_MOVES) return count;
++            moves[count] = original;
++            moves[count].special = promotion;
++            count++;
++        }
++    }
++    return count;
++}
++
+ uint8_t generate_moves(Move *moveList) {
+     uint8_t count = 0;
+     uint8_t sq, piece, type, color;
+@@ -163,7 +178,7 @@
+                 } else {
+                     moveList[count].special = 0;
+                 }
+-                count++;
++                count = append_promotion_options(moveList, count);
+                 if (count >= MAX_MOVES)
+                     return count;
+ 
+@@ -198,7 +213,7 @@
+                     } else {
+                         moveList[count].special = 0;
+                     }
+-                    count++;
++                    count = append_promotion_options(moveList, count);
+                     if (count >= MAX_MOVES)
+                         return count;
+                 }
+@@ -412,15 +427,12 @@
+             board[0x70] = EMPTY;
+             eval_move_piece(rook, 0x70, 0x73);
+         }
+-    } else if (m->special == 3) {       // Promotion
+-        // The pawn has already moved to 'to' by the standard logic above.
+-        // Now transform it into a Queen.
+-        uint8_t queen = color | QUEEN;
+-        board[to] = queen;
+-
+-        // Update Eval: Remove the Pawn value we just added, add Queen value instead
++    } else if (m->special >= 3 && m->special <= 6) { // FIDE promotion
++        const uint8_t options[4] = { QUEEN, ROOK, BISHOP, KNIGHT };
++        uint8_t promoted = color | options[m->special - 3];
++        board[to] = promoted;
+         eval_remove_piece(color | PAWN, to);
+-        eval_add_piece(queen, to);
++        eval_add_piece(promoted, to);
+     }
+     // Update Rights
+     if (type == KING) {
+@@ -522,15 +534,10 @@
+             board[0x73] = EMPTY;
+             eval_move_piece(rook, 0x73, 0x70);
+         }
+-    } else if (m->special == 3) {       // Undo Promotion
+-        // The standard logic above moved the piece back from 'to' to 'from'.
+-        // But that piece was a Queen. We need to turn it back into a Pawn.
+-
+-        uint8_t pawn = sideToMove | PAWN;       // sideToMove is already flipped back
++    } else if (m->special >= 3 && m->special <= 6) { // Undo promotion
++        uint8_t pawn = sideToMove | PAWN;
+         board[m->from] = pawn;
+-
+-        // Update Eval: Remove the Queen, add the Pawn
+-        eval_remove_piece(sideToMove | QUEEN, m->from);
++        eval_remove_piece(piece, m->from);
+         eval_add_piece(pawn, m->from);
+     }
+     // Restore State
