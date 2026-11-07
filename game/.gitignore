@@ -1,0 +1,5 @@
+build/
+*.gb
+*.gbc
+*.sav
+__pycache__/
